@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { FormEvent, ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
-import { apiGet, apiPost, apiUpload } from "../api/client";
+import { apiGet, apiPost, apiUpload, rewriteMinioUrl } from "../api/client";
 import type { GameState, RoundInfo, ReferenceImageInfo, ReferenceImagesListResponse, LeaderboardEntry, LeaderboardResponse } from "../types/api";
 import { useGameWebSocket } from "../hooks/useGameWebSocket";
 import type { GameEvent } from "../hooks/useGameWebSocket";
@@ -288,7 +288,7 @@ export function AdminGamePage() {
                           style={{ width: "80px", height: "80px" }}
                         >
                           <img
-                            src={img.url}
+                            src={rewriteMinioUrl(img.url) || ""}
                             alt={img.name}
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                           />
@@ -303,7 +303,7 @@ export function AdminGamePage() {
                   <div className="mt-2">
                     <small className="text-muted">Selected:</small>
                     <img
-                      src={selectedRefImage}
+                      src={rewriteMinioUrl(selectedRefImage) || ""}
                       alt="Selected reference"
                       className="d-block mt-1 rounded"
                       style={{ maxHeight: "150px", maxWidth: "100%" }}
@@ -359,7 +359,7 @@ export function AdminGamePage() {
                   <div className="card text-center p-2">
                     {s.imageUrl ? (
                       <img
-                        src={s.imageUrl}
+                        src={rewriteMinioUrl(s.imageUrl) || ""}
                         alt={`Submission by ${s.playerNickname}`}
                         className="img-fluid rounded mb-2"
                         style={{ aspectRatio: "1", objectFit: "cover" }}

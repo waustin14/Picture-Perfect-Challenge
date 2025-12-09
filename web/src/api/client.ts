@@ -4,6 +4,8 @@ const API_BASE_URL =
 const WS_BASE_URL =
   import.meta.env.VITE_WS_BASE_URL || getDefaultWsBaseUrl();
 
+const MINIO_PORT = import.meta.env.VITE_MINIO_PORT || "9000";
+
 export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
@@ -77,5 +79,38 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
     throw new Error(text || `Upload to ${path} failed`);
   }
   return res.json() as Promise<T>;
+}
+
+/**
+ * Rewrites MinIO URLs to use the current browser hostname.
+ * This allows images stored in MinIO to be accessed when the app
+ * is running on a remote server (not just localhost).
+ *
+ * Example: http://localhost:9000/bucket/image.png
+ *       -> http://192.168.1.100:9000/bucket/image.png
+ */
+export function rewriteMinioUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  if (typeof window === "undefined") {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    // Check if this looks like a MinIO URL (port 9000 or matches known MinIO hostnames)
+    if (parsed.port === "9000" || parsed.hostname === "minio" || parsed.hostname === "localhost") {
+      const currentHostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      parsed.hostname = currentHostname;
+      parsed.port = MINIO_PORT;
+      parsed.protocol = protocol;
+      return parsed.toString();
+    }
+  } catch {
+    // If URL parsing fails, return original
+  }
+
+  return url;
 }
 

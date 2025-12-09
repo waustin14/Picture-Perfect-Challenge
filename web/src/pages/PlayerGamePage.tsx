@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { apiGet, apiPost } from "../api/client";
+import { apiGet, apiPost, rewriteMinioUrl } from "../api/client";
 import type { GameState, RoundInfo, LeaderboardEntry, LeaderboardResponse } from "../types/api";
 import { useGameWebSocket } from "../hooks/useGameWebSocket";
 import type { GameEvent, PlayerScoreInfo } from "../hooks/useGameWebSocket";
@@ -223,7 +223,7 @@ export function PlayerGamePage() {
           <div className="text-center mb-4">
             <h5>Reference Image</h5>
             <img
-              src={roundResults.reference_image_url}
+              src={rewriteMinioUrl(roundResults.reference_image_url) || ""}
               alt="Reference"
               className="img-fluid rounded"
               style={{ maxHeight: "200px", objectFit: "contain" }}
@@ -243,7 +243,7 @@ export function PlayerGamePage() {
                   </div>
                   {ps.image_url ? (
                     <img
-                      src={ps.image_url}
+                      src={rewriteMinioUrl(ps.image_url) || ""}
                       alt={`${ps.nickname}'s submission`}
                       className="img-fluid rounded mb-2"
                       style={{ aspectRatio: "1", objectFit: "cover", maxHeight: "150px" }}
@@ -279,7 +279,7 @@ export function PlayerGamePage() {
                       <div className="text-muted mb-1">#{playerIndex + 1}</div>
                       {playerResult.image_url && (
                         <img
-                          src={playerResult.image_url}
+                          src={rewriteMinioUrl(playerResult.image_url) || ""}
                           alt="Your submission"
                           className="img-fluid rounded mb-2"
                           style={{ maxHeight: "100px", objectFit: "cover" }}
@@ -308,7 +308,7 @@ export function PlayerGamePage() {
             <h5>Reference Image - Try to match this!</h5>
             {referenceImageUrl ? (
               <img
-                src={referenceImageUrl}
+                src={rewriteMinioUrl(referenceImageUrl) || ""}
                 alt="Reference"
                 className="img-fluid rounded mx-auto"
                 style={{ maxHeight: "250px", objectFit: "contain" }}
@@ -326,7 +326,7 @@ export function PlayerGamePage() {
                   <div>
                     {attempts.find(a => a.id === selectedImageId)?.imageUrl ? (
                       <img
-                        src={attempts.find(a => a.id === selectedImageId)?.imageUrl || ""}
+                        src={rewriteMinioUrl(attempts.find(a => a.id === selectedImageId)?.imageUrl) || ""}
                         alt="Selected image"
                         className="img-fluid rounded"
                         style={{ maxHeight: "400px", objectFit: "contain" }}
@@ -359,7 +359,7 @@ export function PlayerGamePage() {
                   >
                     {a.imageUrl ? (
                       <img
-                        src={a.imageUrl}
+                        src={rewriteMinioUrl(a.imageUrl) || ""}
                         alt={`Attempt ${index + 1}`}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
