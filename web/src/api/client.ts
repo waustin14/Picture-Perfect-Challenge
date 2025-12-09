@@ -1,10 +1,10 @@
+// Use /app prefix for API calls (reverse proxied through nginx to logic service)
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || getDefaultApiBaseUrl();
 
+// Use /app prefix for WebSocket (reverse proxied through nginx to logic service)
 const WS_BASE_URL =
   import.meta.env.VITE_WS_BASE_URL || getDefaultWsBaseUrl();
-
-const MINIO_PORT = import.meta.env.VITE_MINIO_PORT || "9000";
 
 export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -15,29 +15,31 @@ export function wsUrl(path: string): string {
 }
 
 function getDefaultApiBaseUrl(): string {
-    if (typeof window === "undefined") {
-        // fallback for non-browser environments
-        return "http://localhost:8000";
-    }
+  if (typeof window === "undefined") {
+    // fallback for non-browser environments
+    return "http://localhost:3000/app";
+  }
 
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const apiPort = "8000";
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const port = window.location.port || (protocol === "https:" ? "443" : "80");
 
-    return `${protocol}//${hostname}:${apiPort}`;
+  // Use same origin with /app prefix
+  return `${protocol}//${hostname}${port !== "80" && port !== "443" ? `:${port}` : ""}/app`;
 }
 
 function getDefaultWsBaseUrl(): string {
   if (typeof window === "undefined") {
-    return "ws://localhost:8000";
+    return "ws://localhost:3000/app";
   }
 
   const isHttps = window.location.protocol === "https:";
   const wsProtocol = isHttps ? "wss:" : "ws:";
   const hostname = window.location.hostname;
-  const apiPort = "8000";
+  const port = window.location.port || (isHttps ? "443" : "80");
 
-  return `${wsProtocol}//${hostname}:${apiPort}`;
+  // Use same origin with /app prefix
+  return `${wsProtocol}//${hostname}${port !== "80" && port !== "443" ? `:${port}` : ""}/app`;
 }
 
 // Simple fetch wrapper
@@ -82,12 +84,12 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
 }
 
 /**
- * Rewrites MinIO URLs to use the current browser hostname.
- * This allows images stored in MinIO to be accessed when the app
- * is running on a remote server (not just localhost).
+ * Rewrites MinIO URLs to use the /images reverse proxy path.
+ * This allows images stored in MinIO to be accessed through the same
+ * origin as the web app, which works with Cloudflare tunnels.
  *
  * Example: http://localhost:9000/bucket/image.png
- *       -> http://192.168.1.100:9000/bucket/image.png
+ *       -> /images/bucket/image.png
  */
 export function rewriteMinioUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -100,12 +102,8 @@ export function rewriteMinioUrl(url: string | null | undefined): string | null {
     const parsed = new URL(url);
     // Check if this looks like a MinIO URL (port 9000 or matches known MinIO hostnames)
     if (parsed.port === "9000" || parsed.hostname === "minio" || parsed.hostname === "localhost") {
-      const currentHostname = window.location.hostname;
-      const protocol = window.location.protocol;
-      parsed.hostname = currentHostname;
-      parsed.port = MINIO_PORT;
-      parsed.protocol = protocol;
-      return parsed.toString();
+      // Use the /images proxy path instead of direct MinIO access
+      return `/images${parsed.pathname}${parsed.search}`;
     }
   } catch {
     // If URL parsing fails, return original
