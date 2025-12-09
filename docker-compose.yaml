@@ -1,0 +1,235 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: image-game-postgres
+    environment:
+      POSTGRES_DB: imagegame
+      POSTGRES_USER: imagegame
+      POSTGRES_PASSWORD: imagegame_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - game_net
+
+  logic:
+    build:
+      context: ./logic-service
+    container_name: image-game-logic
+    environment:
+      # Database connectivity
+      DATABASE_URL: postgresql+psycopg2://imagegame:imagegame_password@db:5432/imagegame
+
+      # Image generation service URL (inside the compose network)
+      IMAGE_GEN_URL: http://image-gen:8080
+
+      # Image similarity service URL
+      IMAGE_SIM_URL: http://image-sim:8080
+
+      # MinIO storage settings
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: game-images
+      MINIO_PUBLIC_URL: http://localhost:9000
+      MINIO_INTERNAL_URL: http://minio:9000
+
+      # Simple admin token for admin-only endpoints (end round, score, etc.)
+      ADMIN_TOKEN: dev-admin-token
+      # OpenTelemetry
+      OTEL_SERVICE_NAME: logic-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+    depends_on:
+      db:
+        condition: service_started
+      image-gen:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    networks:
+      - game_net
+
+  image-gen:
+    build:
+      context: ./image-gen
+    container_name: image-game-image-gen
+    environment:
+      # Switch between "mock", "local", and "stability" backends
+      GEN_MODE: stability
+
+      # Local backend settings (used when GEN_MODE=local)
+      # MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
+      #DEVICE: cpu                # change to "cuda" on a GPU box
+      # OUTPUT_DIR: /data/images
+      # PUBLIC_BASE_URL: http://image-gen:8080
+
+      # Stability AI backend settings (used when GEN_MODE=stability)
+      STABILITY_API_KEY: sk-BUQbMT7AdWTbEulvvNRaEWX8eEubPeSwvcx4HJPPsNKu3zrX
+      STABILITY_API_HOST: https://api.stability.ai
+      STABILITY_ENGINE_ID: stable-diffusion-xl-1024-v1-0
+
+      # MinIO storage settings
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: game-images
+      MINIO_PUBLIC_URL: http://localhost:9000
+
+      # OpenTelemetry
+      OTEL_SERVICE_NAME: image-gen
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+    volumes:
+      - image_data:/data
+    ports:
+      - "8080:8080"
+    # If you have GPUs and the NVIDIA container runtime:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: ["gpu"]
+    depends_on:
+      otel-collector:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    networks:
+      - game_net
+
+  web:
+    build:
+      context: ./web
+    container_name: image-game-web
+    # NOTE: Vite reads env vars at build time; if you want these
+    # baked into the frontend, pass them as build args in your Dockerfile too.
+    #environment:
+      # VITE_API_BASE_URL: http://logic:8000
+      # VITE_WS_BASE_URL: ws://logic:8000
+    depends_on:
+      - logic
+    ports:
+      - "3000:80"
+    networks:
+      - game_net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: image-game-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    depends_on:
+      jaeger:
+        condition: service_healthy
+    networks:
+      - game_net
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: image-game-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317"          # OTLP gRPC (internal only, for collector)
+      - "4318"          # OTLP HTTP (internal only, for collector)
+      - "14250:14250"   # Jaeger gRPC
+      - "14268:14268"   # HTTP thrift
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:14269/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - game_net
+
+  minio:
+    image: minio/minio:latest
+    container_name: image-game-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Console
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - game_net
+
+  image-sim:
+    build:
+      context: ./image-similarity
+    container_name: image-game-image-sim
+    environment:
+      DEVICE: cpu  # Change to "cuda" if GPU available
+      MODEL_TYPE: dino_vitb16
+      MODEL_CACHE_DIR: /app/models
+      MAX_PAIRS_PER_REQUEST: 128
+      BATCH_SIZE_LIMIT: 64
+      # OpenTelemetry
+      OTEL_SERVICE_NAME: image-sim
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+    volumes:
+      - image_sim_models:/app/models
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r = requests.get('http://localhost:8080/health'); exit(0 if r.status_code == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      otel-collector:
+        condition: service_started
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: ["gpu"]
+    networks:
+      - game_net
+
+  #cloudflared:
+  #  image: cloudflare/cloudflared:latest
+  #  container_name: image-game-cloudflared
+    # This assumes you've set up a Cloudflare Tunnel and have a token
+    # Replace the token value below.
+  #  environment:
+  #    TUNNEL_TOKEN: "REPLACE_WITH_YOUR_TUNNEL_TOKEN"
+  #  command: tunnel run
+  #  depends_on:
+  #    - web
+  #  networks:
+  #    - game_net
+    # If you don't want this yet, you can comment out this entire service.
+
+volumes:
+  db_data:
+  image_data:
+  minio_data:
+  image_sim_models:
+
+networks:
+  game_net:
+    driver: bridge

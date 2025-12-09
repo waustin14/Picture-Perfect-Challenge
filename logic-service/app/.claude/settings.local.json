@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker run:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(GAME_ID=\"1405ed8c-b885-4af1-bd0c-fd51f46ea0b3\":*)",
+      "Bash(PLAYER_ID=\"5deaec6d-90ab-47f9-a3a4-d7989c4b4c76\":*)",
+      "Bash(ROUND_ID=\"2cdfb9f8-c53b-4564-94cf-339ff9d08509\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

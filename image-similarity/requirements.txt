@@ -1,0 +1,36 @@
+# Core dependencies
+numpy<2.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+dreamsim>=0.2.1
+
+# API framework
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+
+# HTTP client for URL fetching
+httpx>=0.24.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Validation
+pydantic>=2.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+requests>=2.31.0
+
+# DreamSim dependencies (some may be pulled automatically)
+open-clip-torch>=2.20.0
+peft>=0.2.0
+timm>=0.9.0
+transformers>=4.30.0
+scipy>=1.10.0
+
+# OpenTelemetry
+opentelemetry-sdk>=1.27.0
+opentelemetry-exporter-otlp>=1.27.0
+opentelemetry-instrumentation-fastapi>=0.48b0
+opentelemetry-instrumentation-httpx>=0.48b0
