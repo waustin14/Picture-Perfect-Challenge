@@ -62,18 +62,18 @@ services:
     container_name: image-game-image-gen
     environment:
       # Switch between "mock", "local", and "stability" backends
-      GEN_MODE: stability
+      GEN_MODE: local
 
       # Local backend settings (used when GEN_MODE=local)
-      # MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
-      #DEVICE: cpu                # change to "cuda" on a GPU box
-      # OUTPUT_DIR: /data/images
-      # PUBLIC_BASE_URL: http://image-gen:8080
+      MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
+      DEVICE: cuda                # change to "cuda" on a GPU box
+      OUTPUT_DIR: /data/images
+      PUBLIC_BASE_URL: http://image-gen:8080
 
       # Stability AI backend settings (used when GEN_MODE=stability)
-      STABILITY_API_KEY: sk-BUQbMT7AdWTbEulvvNRaEWX8eEubPeSwvcx4HJPPsNKu3zrX
-      STABILITY_API_HOST: https://api.stability.ai
-      STABILITY_ENGINE_ID: stable-diffusion-xl-1024-v1-0
+      # STABILITY_API_KEY: sk-***
+      # STABILITY_API_HOST: https://api.stability.ai
+      # STABILITY_ENGINE_ID: stable-diffusion-xl-1024-v1-0
 
       # MinIO storage settings
       MINIO_ENDPOINT: minio:9000
