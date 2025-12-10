@@ -246,12 +246,12 @@ export function PlayerGamePage() {
                       src={rewriteMinioUrl(ps.image_url) || ""}
                       alt={`${ps.nickname}'s submission`}
                       className="img-fluid rounded mb-2"
-                      style={{ aspectRatio: "1", objectFit: "cover", maxHeight: "150px" }}
+                      style={{ maxHeight: "200px", objectFit: "contain", width: "100%" }}
                     />
                   ) : (
                     <div
                       className="bg-secondary rounded mb-2 d-flex align-items-center justify-content-center text-white"
-                      style={{ aspectRatio: "1", maxHeight: "150px" }}
+                      style={{ height: "150px" }}
                     >
                       No submission
                     </div>
