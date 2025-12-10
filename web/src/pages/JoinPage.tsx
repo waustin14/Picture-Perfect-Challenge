@@ -24,7 +24,6 @@ export function JoinPage() {
         nickname,
       });
 
-      // You need the gameId too, so hit by-code endpoint
       const gameSummary = await apiGet<{ id: string; code: string; name: string; status: string; created_at: string; admin_name: string }>(
         "/games/by-code/" + code.toUpperCase()
       );
@@ -43,32 +42,55 @@ export function JoinPage() {
   };
 
   return (
-    <div className="container py-5">
-      <h1 className="mb-4">Join Game</h1>
-      <form onSubmit={handleSubmit} className="card p-4">
-        <div className="mb-3">
-          <label className="form-label">Game Code</label>
-          <input
-            className="form-control"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            required
-          />
+    <div className="entry-container">
+      <div className="entry-card">
+        <div className="entry-header">
+          <h1 className="entry-logo">Picture Perfect</h1>
+          <p className="entry-tagline">Generate AI images to match the target</p>
         </div>
-        <div className="mb-3">
-          <label className="form-label">Nickname</label>
-          <input
-            className="form-control"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            required
-          />
+
+        <form onSubmit={handleSubmit} className="entry-form">
+          <div className="form-group">
+            <label className="form-label">Game Code</label>
+            <input
+              type="text"
+              className="form-input form-input--code"
+              placeholder="ABCD"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Your Nickname</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Enter your name"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              maxLength={20}
+              required
+            />
+          </div>
+
+          {error && <div className="form-error">{error}</div>}
+
+          <button
+            type="submit"
+            className="btn btn--primary btn--full btn--large"
+            disabled={loading || !code.trim() || !nickname.trim()}
+          >
+            {loading ? "Joining..." : "Join Game"}
+          </button>
+        </form>
+
+        <div className="entry-footer">
+          <a href="/admin" className="entry-link">Host a game instead</a>
         </div>
-        {error && <div className="alert alert-danger">{error}</div>}
-        <button className="btn btn-success" type="submit" disabled={loading}>
-          {loading ? "Joining..." : "Join"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }
