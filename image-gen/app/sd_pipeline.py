@@ -206,6 +206,9 @@ class LocalSDBackend:
         gpu_info = f" (GPU {gpu_id})" if gpu_id is not None else ""
         print(f"[image-gen] Using LOCAL backend with model {self.model_id} on {self.device}{gpu_info}")
 
+        # Set model-specific defaults
+        self._set_model_defaults()
+
         # Detect model type and use appropriate pipeline
         is_sd3 = "stable-diffusion-3" in self.model_id.lower()
         pipeline_class = StableDiffusion3Pipeline if is_sd3 else StableDiffusionXLPipeline
@@ -243,6 +246,40 @@ class LocalSDBackend:
         except Exception as e:
             print(f"[image-gen] Could not enable attention slicing: {e}")
 
+    def _set_model_defaults(self):
+        """Set default parameters based on the model being used."""
+        model_lower = self.model_id.lower()
+
+        if "stable-diffusion-3.5-large-turbo" in model_lower or "sd3.5-turbo" in model_lower:
+            # SD 3.5 Large Turbo: optimized for speed
+            self.default_guidance_scale = 1.0
+            self.default_num_steps = 4
+            print(f"[image-gen] Model defaults: SD 3.5 Large Turbo (cfg_scale=1.0, steps=4)")
+        elif "stable-diffusion-3.5-large" in model_lower or "sd3.5-large" in model_lower:
+            # SD 3.5 Large: optimized for quality
+            self.default_guidance_scale = 4.5
+            self.default_num_steps = 40
+            print(f"[image-gen] Model defaults: SD 3.5 Large (cfg_scale=4.5, steps=40)")
+        elif "stable-diffusion-3" in model_lower:
+            # Other SD3 models: use moderate defaults
+            self.default_guidance_scale = 5.0
+            self.default_num_steps = 28
+            print(f"[image-gen] Model defaults: SD 3.x (cfg_scale=5.0, steps=28)")
+        else:
+            # SDXL and other models: traditional defaults
+            self.default_guidance_scale = 7.5
+            self.default_num_steps = 25
+            print(f"[image-gen] Model defaults: SDXL/Other (cfg_scale=7.5, steps=25)")
+
+    def _apply_request_defaults(self, req: GenerateRequest) -> GenerateRequest:
+        """Apply model-specific defaults to request if not explicitly set."""
+        # Create a copy to avoid modifying the original
+        if req.guidance_scale is None:
+            req.guidance_scale = self.default_guidance_scale
+        if req.num_inference_steps is None:
+            req.num_inference_steps = self.default_num_steps
+        return req
+
     def _save_image(self, image: Image.Image, req: GenerateRequest, seed: int, duration_ms: int) -> GenerateResponse:
         image_id = str(uuid.uuid4())
 
@@ -278,6 +315,9 @@ class LocalSDBackend:
         )
 
     def generate(self, req: GenerateRequest) -> GenerateResponse:
+        # Apply model-specific defaults
+        req = self._apply_request_defaults(req)
+
         start = time.time()
 
         if req.seed is not None:
@@ -489,6 +529,9 @@ class BatchedLocalSDBackend:
 
         # Multi-request batch processing
         start = time.time()
+
+        # Apply model-specific defaults to all requests
+        requests = [self.backend._apply_request_defaults(req) for req in requests]
 
         # Collect all prompts and parameters
         prompts = [req.prompt for req in requests]
@@ -1035,11 +1078,13 @@ class StableDiffusionService:
 
     async def generate_async(self, req: GenerateRequest) -> GenerateResponse:
         """Async generate method for batched backends."""
-        if self.is_async and hasattr(self.backend, 'generate'):
-            return await self.backend.generate(req)
-        else:
-            # Fallback to sync backend wrapped in thread
-            return await asyncio.to_thread(self.backend.generate, req)
+        result = self.backend.generate(req)
+
+        # If the result is a coroutine, await it
+        if asyncio.iscoroutine(result):
+            result = await result
+
+        return result
 
     def generate(self, req: GenerateRequest) -> GenerateResponse:
         """Sync generate method (deprecated - use generate_async)."""
