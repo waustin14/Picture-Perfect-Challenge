@@ -99,7 +99,9 @@ app.add_middleware(
 )
 
 # Initialize SD pipeline at startup
+print("[image-gen] Initializing StableDiffusionService...")
 sd_service = StableDiffusionService()
+print("[image-gen] StableDiffusionService initialized")
 
 # Serve images from /data/images as /images/...
 # We assume OUTPUT_DIR default is /data/images, so mount /data as /.
@@ -110,15 +112,41 @@ app.mount(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Start the batch processor on application startup."""
+    print("[image-gen] Running startup event...")
+    try:
+        await sd_service.start_processor()
+        print("[image-gen] Batch processor started successfully")
+    except Exception as e:
+        print(f"[image-gen] Error starting batch processor: {e}")
+        import traceback
+        traceback.print_exc()
+    print("[image-gen] Application startup complete")
+
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
 
+@app.get("/stats")
+async def get_stats():
+    """Get batch processing statistics and performance metrics."""
+    return await sd_service.get_stats()
+
+
 @app.post("/generate", response_model=GenerateResponse)
-def generate(req: GenerateRequest):
+async def generate(req: GenerateRequest):
+    """
+    Generate an image from a text prompt.
+
+    Requests are automatically batched when using local backend with batching enabled.
+    This significantly improves throughput for concurrent requests.
+    """
     try:
-        return sd_service.generate(req)
+        return await sd_service.generate_async(req)
     except Exception as e:
         # In practice, log this properly
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")

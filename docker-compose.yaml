@@ -65,15 +65,40 @@ services:
       GEN_MODE: local
 
       # Local backend settings (used when GEN_MODE=local)
+      # Model options:
+      #   - stabilityai/stable-diffusion-xl-base-1.0 (SDXL, 6.9GB, 20-50 steps)
+      #   - stabilityai/stable-diffusion-3.5-large-turbo (SD3.5 Turbo, 11GB, 4-8 steps, faster & better quality)
+      #   - stabilityai/stable-diffusion-3.5-large (SD3.5 Large, 11GB, 20-50 steps, highest quality)
       MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
-      DEVICE: cuda                # change to "cuda" on a GPU box
+      DEVICE: cuda
       OUTPUT_DIR: /data/images
       PUBLIC_BASE_URL: http://image-gen:8080
+
+      # HuggingFace token (required for some models like SD 3.5)
+      # Get token from: https://huggingface.co/settings/tokens
+      # HF_TOKEN: hf_your_token_here
+
+      # Batching configuration (auto-detects optimal batch size based on GPU VRAM)
+      ENABLE_BATCHING: "true"
+      # MAX_BATCH_SIZE: 8  # Optional: Override auto-detection
+      MAX_BATCH_WAIT_TIME: "5.0"
+      MIN_BATCH_WAIT_TIME: "0.5"
+      ENABLE_ADAPTIVE_BATCHING: "true"
+      ADAPTIVE_BATCH_THRESHOLD: "10"
+
+      # Multi-GPU configuration (optional)
+      # GPU_IDS: 0,1,2  # Specify which GPUs to use
+      # GPU_LOAD_BALANCE_STRATEGY: queue-depth  # or "round-robin"
+
+      # Model cache (persisted in volume at /data/huggingface)
+      # Models downloaded once and reused across container rebuilds
+      HF_HOME: /data/huggingface
+      TRANSFORMERS_CACHE: /data/huggingface/hub
 
       # Stability AI backend settings (used when GEN_MODE=stability)
       # STABILITY_API_KEY: sk-***
       # STABILITY_API_HOST: https://api.stability.ai
-      # STABILITY_ENGINE_ID: stable-diffusion-xl-1024-v1-0
+      # STABILITY_ENGINE_ID: stable-diffusion-xl-1024-v-0
 
       # MinIO storage settings
       MINIO_ENDPOINT: minio:9000
@@ -86,15 +111,15 @@ services:
       OTEL_SERVICE_NAME: image-gen
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
     volumes:
-      - image_data:/data
+      - image_data:/data  # Persists /data/images AND /data/huggingface (model cache)
     ports:
       - "8080:8080"
-    # If you have GPUs and the NVIDIA container runtime:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: ["gpu"]
+    # GPU support (enabled)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
     depends_on:
       otel-collector:
         condition: service_started
