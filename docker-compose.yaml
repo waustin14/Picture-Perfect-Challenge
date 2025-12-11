@@ -69,7 +69,7 @@ services:
       #   - stabilityai/stable-diffusion-xl-base-1.0 (SDXL, 6.9GB, 20-50 steps)
       #   - stabilityai/stable-diffusion-3.5-large-turbo (SD3.5 Turbo, 11GB, 4-8 steps, faster & better quality)
       #   - stabilityai/stable-diffusion-3.5-large (SD3.5 Large, 11GB, 20-50 steps, highest quality)
-      MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
+      MODEL_ID: stabilityai/stable-diffusion-3.5-large-turbo
       DEVICE: cuda
       OUTPUT_DIR: /data/images
       PUBLIC_BASE_URL: http://image-gen:8080
@@ -80,7 +80,7 @@ services:
 
       # Batching configuration (auto-detects optimal batch size based on GPU VRAM)
       ENABLE_BATCHING: "true"
-      # MAX_BATCH_SIZE: 8  # Optional: Override auto-detection
+      MAX_BATCH_SIZE: 5  # Optional: Override auto-detection
       MAX_BATCH_WAIT_TIME: "5.0"
       MIN_BATCH_WAIT_TIME: "0.5"
       ENABLE_ADAPTIVE_BATCHING: "true"
@@ -227,26 +227,26 @@ services:
       otel-collector:
         condition: service_started
     # Uncomment for GPU support:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: ["gpu"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
     networks:
       - game_net
 
-  #cloudflared:
-  #  image: cloudflare/cloudflared:latest
-  #  container_name: image-game-cloudflared
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: image-game-cloudflared
     # This assumes you've set up a Cloudflare Tunnel and have a token
     # Replace the token value below.
-  #  environment:
-  #    TUNNEL_TOKEN: "REPLACE_WITH_YOUR_TUNNEL_TOKEN"
-  #  command: tunnel run
-  #  depends_on:
-  #    - web
-  #  networks:
-  #    - game_net
+    environment:
+      TUNNEL_TOKEN: "REPLACE_WITH_YOUR_TUNNEL_TOKEN"
+    command: tunnel run
+    depends_on:
+      - web
+    networks:
+      - game_net
     # If you don't want this yet, you can comment out this entire service.
 
 volumes:
