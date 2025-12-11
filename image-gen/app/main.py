@@ -145,8 +145,23 @@ async def generate(req: GenerateRequest):
     Requests are automatically batched when using local backend with batching enabled.
     This significantly improves throughput for concurrent requests.
     """
+    import asyncio
     try:
-        return await sd_service.generate_async(req)
+        print(f"[generate] Calling generate_async, backend type: {type(sd_service.backend)}")
+        print(f"[generate] is_async flag: {sd_service.is_async}")
+
+        result = sd_service.generate_async(req)
+        print(f"[generate] Result type after call: {type(result)}")
+
+        # Ensure we await if it's a coroutine
+        if asyncio.iscoroutine(result):
+            print(f"[generate] Awaiting coroutine...")
+            result = await result
+            print(f"[generate] Result type after await: {type(result)}")
+
+        return result
     except Exception as e:
         # In practice, log this properly
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")

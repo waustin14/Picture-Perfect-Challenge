@@ -42,13 +42,15 @@ SD 3.5 requires accepting the license and using an access token.
 
 ### 2. Update diffusers Library
 
-Ensure you have `diffusers>=0.30.0`:
+Ensure you have `diffusers>=0.31.0`:
 
 ```bash
 # Check version
 docker exec image-game-image-gen pip show diffusers
 
-# If needed, update requirements.txt and rebuild
+# The requirements.txt has been updated to diffusers>=0.31.0
+# Rebuild the container to pick up the new version
+docker-compose up -d --build image-gen
 ```
 
 ---
@@ -131,19 +133,23 @@ Downloading (…)_model/model.safetensors: 100%|██| 11.2G/11.2G [15:23<00:00
 ### 4. Test Generation
 
 ```bash
-# Test single image
+# Test single image - defaults are automatically applied based on model!
 curl -X POST http://localhost:8080/generate \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "a photorealistic cat wearing a space helmet, highly detailed",
     "game_id": "test",
     "round_id": "test",
-    "player_id": "test",
-    "num_inference_steps": 4
+    "player_id": "test"
   }'
 ```
 
-**Note:** Use `num_inference_steps: 4-8` for Turbo models (not 20-50).
+**Note:** The service now automatically applies model-specific defaults:
+- **SD 3.5 Large Turbo**: `guidance_scale: 1.0`, `num_inference_steps: 4`
+- **SD 3.5 Large**: `guidance_scale: 4.5`, `num_inference_steps: 40`
+- **SDXL**: `guidance_scale: 7.5`, `num_inference_steps: 25`
+
+You can still override these by explicitly setting the values in your request.
 
 ---
 
@@ -198,23 +204,25 @@ curl -X POST http://localhost:8080/generate \
 
 ## Optimizing for SD 3.5 Turbo
 
-### 1. Reduce Inference Steps in Frontend
+### 1. Automatic Model-Specific Defaults ✨
 
-Update default steps for Turbo model:
+**No changes needed!** The service automatically applies optimal defaults based on the model:
 
-```typescript
-// In your frontend or API
-const inferenceSteps = modelId.includes('turbo') ? 4 : 25;
-```
+- **SD 3.5 Large Turbo**: `guidance_scale: 1.0`, `num_inference_steps: 4`
+- **SD 3.5 Large**: `guidance_scale: 4.5`, `num_inference_steps: 40`
+- **SDXL**: `guidance_scale: 7.5`, `num_inference_steps: 25`
 
-### 2. Adjust Guidance Scale
+Simply omit `guidance_scale` and `num_inference_steps` from your request to use the optimal defaults.
 
-SD 3.5 works well with lower guidance:
+### 2. Override Defaults (Optional)
+
+You can still manually override for experimentation:
 
 ```json
 {
-  "guidance_scale": 3.5,  // Lower for SD3.5 (vs 7.5 for SDXL)
-  "num_inference_steps": 4
+  "prompt": "your prompt here",
+  "guidance_scale": 2.0,  // Override default
+  "num_inference_steps": 6  // Override default
 }
 ```
 
@@ -290,13 +298,14 @@ self.pipe.enable_sequential_cpu_offload()
 
 ### Issue: Slow Generation with SD 3.5
 
-**Cause:** Using too many inference steps
+**Cause:** Manually overriding inference steps to a high value
 
 **Fix:**
-Use 4-8 steps for Turbo models:
+Omit `num_inference_steps` from your request to use automatic defaults (4 steps for Turbo, 40 for Large).
+If you're explicitly setting it, use appropriate values:
 ```json
 {
-  "num_inference_steps": 4  // Not 20-50!
+  "num_inference_steps": 4  // For Turbo (or omit for automatic)
 }
 ```
 
@@ -402,6 +411,7 @@ GPU_LOAD_BALANCE_STRATEGY: queue-depth
 ✅ **Code changes complete** - Automatic model detection
 ✅ **Auto batch sizing** - Adjusts for SD3.5's larger size
 ✅ **HF token support** - Ready for gated models
+✅ **Model-specific defaults** - Automatic cfg_scale and steps based on model
 ✅ **Backward compatible** - SDXL still works
 
 **To switch to SD 3.5:**
@@ -409,7 +419,7 @@ GPU_LOAD_BALANCE_STRATEGY: queue-depth
 2. Update `MODEL_ID` in docker-compose.yaml
 3. Add `HF_TOKEN` to environment
 4. Rebuild container
-5. Use 4-8 inference steps (not 20-50)
+5. ~~Use 4-8 inference steps~~ **Automatic!** Just omit the parameter
 
 **Expected results:**
 - **Faster generation** - 40-50% faster per image
