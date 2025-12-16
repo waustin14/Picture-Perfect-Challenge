@@ -80,6 +80,7 @@ class LeaderboardResponse(BaseModel):
 class GenerateImageRequest(BaseModel):
     player_id: str
     prompt: str
+    negative_prompt: Optional[str] = None
 
 
 class GenerateImageResponse(BaseModel):

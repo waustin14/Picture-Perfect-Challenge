@@ -26,6 +26,7 @@ export function PlayerGamePage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -121,11 +122,16 @@ export function PlayerGamePage() {
     if (!activeRound || activeRound.status !== "running" || !prompt.trim() || !playerId) return;
     setGenerating(true);
     try {
-      await apiPost("/rounds/" + activeRound.id + "/generate", {
+      const payload: { player_id: string; prompt: string; negative_prompt?: string } = {
         player_id: playerId,
         prompt,
-      });
+      };
+      if (negativePrompt.trim()) {
+        payload.negative_prompt = negativePrompt;
+      }
+      await apiPost("/rounds/" + activeRound.id + "/generate", payload);
       setPrompt("");
+      setNegativePrompt("");
     } catch (e) {
       console.error(e);
     } finally {
@@ -338,13 +344,23 @@ export function PlayerGamePage() {
             {/* Prompt Input and Actions */}
             <div className="prompt-section">
               <div style={{ display: "flex", gap: "var(--spacing-sm)", alignItems: "flex-end" }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}>
                   <input
                     type="text"
                     className="prompt-input"
                     placeholder={maxAttemptsReached ? "Max attempts reached" : "Describe the image you want to generate..."}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleGenerate()}
+                    disabled={!roundRunning || roundEnded || maxAttemptsReached}
+                  />
+                  <input
+                    type="text"
+                    className="prompt-input"
+                    style={{ fontSize: "0.85rem", padding: "var(--spacing-xs) var(--spacing-sm)" }}
+                    placeholder="Negative prompt (optional) - things to avoid..."
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleGenerate()}
                     disabled={!roundRunning || roundEnded || maxAttemptsReached}
                   />

@@ -63,6 +63,7 @@ class ImageAttemptDB(Base):
     round_id: Mapped[str] = mapped_column(String, ForeignKey("rounds.id", ondelete="CASCADE"))
     player_id: Mapped[str] = mapped_column(String, ForeignKey("players.id", ondelete="CASCADE"))
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    negative_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     is_submission: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
