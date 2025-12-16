@@ -1,0 +1,82 @@
+[
+  {
+    "prompt": "Ultra-photorealistic portrait photography. A lighthouse keeper in a weathered wool sweater standing on a rocky Atlantic coastline at dawn, calm confident expression. Medium close-up, 85mm lens, shallow depth of field, crisp skin texture. Soft golden backlight, cinematic realism.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, blurry, low resolution, overexposed, underexposed, cartoon, CGI, plastic skin, watermark, logo, text, artifacts, extra fingers, deformed hands, distorted face"
+  },
+  {
+    "prompt": "Flat vector illustration, modern infographic style. A city bike-share system with docking stations and cyclists. Clean geometric shapes, limited color palette, strong visual hierarchy, white background.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, painterly, gradients, messy lines, cluttered layout, illegible text, watermark, logo, noise"
+  },
+  {
+    "prompt": "Isometric pixel art, 16-bit retro style. A neighborhood park with a pond, benches, playground, and people walking dogs. Clear silhouettes, crisp pixels, cheerful palette.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, blurry pixels, anti-aliasing, photorealistic, smooth gradients, low contrast, watermark, text"
+  },
+  {
+    "prompt": "Architectural visualization of a modern public library with floor-to-ceiling glass and shaded entry plaza. Wide-angle, eye-level view, realistic materials, soft global illumination.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, cartoon, sketch, fisheye distortion, warped perspective, noisy textures, watermark, text"
+  },
+  {
+    "prompt": "Impressionist oil painting of a quiet café interior during a rainy afternoon. Visible brush strokes, warm interior lighting, cozy atmosphere.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, sharp digital look, neon colors, watermark, logo, text"
+  },
+  {
+    "prompt": "Minimalist abstract Bauhaus-inspired composition suggesting a city skyline. Overlapping geometric shapes, muted tones, strong negative space.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, gradients, messy textures, noisy background, watermark, text"
+  },
+  {
+    "prompt": "High-detail sci-fi concept art of a lunar research outpost at sunset. Wide cinematic framing, dramatic rim light, realistic materials.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, cartoon, toy-like, foggy, low detail, watermark, text"
+  },
+  {
+    "prompt": "Black-and-white street photography of pedestrians crossing a city intersection. Documentary style, high contrast, slight motion blur.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, color, painterly, CGI, overly smooth, watermark, text"
+  },
+  {
+    "prompt": "Ink and watercolor naturalist field journal illustration of native wildflowers with labeled sketches. Hand-drawn linework, light washes.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, heavy oil paint, messy ink, illegible labels, watermark"
+  },
+  {
+    "prompt": "Retro-futurism 1960s magazine cover illustration of optimistic remote work. Mid-century furniture, bold shapes, halftone texture.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, modern UI realism, photorealistic, messy typography, watermark"
+  },
+  {
+    "prompt": "Top-down aerial photography of a colorful shipping container yard with strong symmetry and patterns. Ultra-sharp detail.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, haze, blur, painterly, cartoon, watermark, text"
+  },
+  {
+    "prompt": "Whimsical children’s book illustration of animals building a treehouse together. Soft linework, pastel colors, warm light.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, dark tone, hyperrealistic, gritty, distorted anatomy, watermark"
+  },
+  {
+    "prompt": "Commercial product photography of a ceramic coffee mug on a wooden desk. Studio lighting, clean background, premium look.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, cluttered background, grain, cartoon, watermark, text"
+  },
+  {
+    "prompt": "Charcoal sketch of a mountain landscape with expressive strokes and dramatic shading. Monochrome fine art.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, color, photorealistic, smooth gradients, watermark"
+  },
+  {
+    "prompt": "Futuristic holographic UI mockup floating in a dark room. Clean layout, sharp neon accents, cinematic lighting.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, legible text, watermark, logo, cluttered UI"
+  },
+  {
+    "prompt": "Surreal digital art of a city street melting into ocean waves. Cinematic twilight palette, dreamlike realism.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, muddy colors, cartoon, noise, watermark"
+  },
+  {
+    "prompt": "Nighttime long-exposure photography of a city park after rain. Reflections on wet pavement, moody atmosphere.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, daytime, flat lighting, blur, watermark"
+  },
+  {
+    "prompt": "Japanese ukiyo-e woodblock print of a river town with bridges and distant hills. Flat perspective, traditional palette.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, 3D render, gradients, watermark"
+  },
+  {
+    "prompt": "Technical cutaway illustration of a wind turbine showing internal components. Clean lines, educational diagram style.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, photorealistic, messy sketch, illegible text, watermark"
+  },
+  {
+    "prompt": "Cinematic fantasy matte painting of a hidden valley with waterfalls and ancient ruins. Epic scale, dramatic clouds.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated elements, visual clutter, cartoon, flat lighting, low detail, watermark"
+  }
+]

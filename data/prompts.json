@@ -1,0 +1,82 @@
+[
+  {
+    "prompt": "Photorealistic environmental photography. A quiet urban plaza with a single mature tree and a few scattered benches, asymmetrically arranged. Eye-level view, 35mm lens look, natural midday light with soft shadows, realistic materials, calm atmosphere.",
+    "negative_prompt": "repetitive, busy, pattern repetition, duplicated objects, cloned benches, visual clutter, crowd, symmetry, cartoon, CGI, watermark, logo, text"
+  },
+  {
+    "prompt": "Painterly digital illustration. A lone cyclist paused at a street corner in a modern city, buildings receding irregularly into the background. Dynamic perspective, expressive brushwork, soft overcast lighting, muted color palette, cinematic mood.",
+    "negative_prompt": "repetitive, busy, tiled buildings, identical windows, symmetry, photorealistic, sharp CGI look, watermark, logo, text"
+  },
+  {
+    "prompt": "Minimalist product-style photography. A single modern desk lamp on a plain tabletop, off-center composition. Soft studio lighting, gentle shadow falloff, clean background, high detail, premium catalog aesthetic.",
+    "negative_prompt": "repetitive, busy, multiple lamps, cluttered background, reflections chaos, watermark, logo, text, cartoon"
+  },
+  {
+    "prompt": "Isometric illustration. A small community garden with irregularly shaped planting beds, a winding path, and a few people tending plants. Clear readable forms, varied spacing, soft daylight, friendly illustrative style.",
+    "negative_prompt": "repetitive, busy, grid layout, duplicated plants, tiled paths, photorealistic, low contrast, watermark, text"
+  },
+  {
+    "prompt": "Impressionist-style painting. A single café table near a window with a cup of coffee and a folded newspaper. Loose brush strokes, warm interior lighting, shallow depth feel, cozy intimate composition.",
+    "negative_prompt": "repetitive, busy, multiple identical tables, sharp digital look, photorealistic, watermark, logo, text"
+  },
+  {
+    "prompt": "Cinematic wide shot. A solitary bus stop on a quiet suburban street, one bench and one shelter, irregular trees in the background. Golden hour lighting, soft lens bloom, realistic textures, calm mood.",
+    "negative_prompt": "repetitive, busy, multiple shelters, cloned trees, symmetry, cartoon, CGI, watermark, logo, text"
+  },
+  {
+    "prompt": "Editorial-style photography. A person reading on a park bench beside a gently curving path, background softly blurred. Natural morning light, candid framing, realistic proportions, documentary tone.",
+    "negative_prompt": "repetitive, busy, crowd, multiple identical benches, pattern repetition, watermark, logo, text"
+  },
+  {
+    "prompt": "Hand-drawn architectural sketch with light watercolor. A small public pavilion with an irregular roofline and varied column spacing. Perspective sketch style, white paper background, subtle color washes.",
+    "negative_prompt": "repetitive, busy, uniform columns, CAD rendering, photorealistic, messy lines, watermark, text"
+  },
+  {
+    "prompt": "Surreal but restrained digital art. A single floating staircase leading upward into a cloudy sky, steps unevenly spaced. Soft diffuse lighting, muted colors, dreamlike but minimal composition.",
+    "negative_prompt": "repetitive, busy, perfectly repeating steps, symmetry, visual clutter, cartoon, watermark, logo, text"
+  },
+  {
+    "prompt": "Nature photography. A winding forest trail with varied tree spacing and uneven ground, one hiker in the distance. Soft dappled light, realistic foliage detail, peaceful atmosphere.",
+    "negative_prompt": "repetitive, busy, cloned trees, patterned leaves, symmetry, oversharpened, watermark, logo, text"
+  },
+  {
+    "prompt": "Flat graphic illustration. A single delivery van parked on a city street with simplified buildings of varied heights. Clean shapes, limited color palette, asymmetrical layout, modern poster style.",
+    "negative_prompt": "repetitive, busy, duplicated buildings, grid layout, gradients, photorealistic, watermark, text"
+  },
+  {
+    "prompt": "Concept art illustration. A small coastal lookout with one wooden railing and uneven rocks below. Wide framing, atmospheric haze, soft cool lighting, painterly realism.",
+    "negative_prompt": "repetitive, busy, cloned rocks, repeating waves, symmetry, low detail, watermark, logo, text"
+  },
+  {
+    "prompt": "Charcoal sketch. A single farmhouse at the edge of an open field, uneven fence posts leading toward it. Expressive shading, strong contrast, hand-drawn texture.",
+    "negative_prompt": "repetitive, busy, uniform fence posts, photorealistic, smooth gradients, watermark, text"
+  },
+  {
+    "prompt": "Cinematic sci-fi realism. A lone exploration rover stopped beside a rock formation on an alien plain. Low-angle shot, dramatic sky, varied terrain, realistic materials.",
+    "negative_prompt": "repetitive, busy, multiple identical rovers, tiled terrain, symmetry, cartoon, watermark, logo, text"
+  },
+  {
+    "prompt": "Watercolor illustration. A small harbor with a few boats of different sizes gently drifting apart. Loose lines, soft pastel colors, calm composition, light reflections.",
+    "negative_prompt": "repetitive, busy, identical boats, grid alignment, photorealistic, muddy colors, watermark, text"
+  },
+  {
+    "prompt": "Street-level photography. A single food cart at a quiet corner, uneven sidewalk textures, buildings receding naturally. Overcast lighting, candid framing, realistic urban detail.",
+    "negative_prompt": "repetitive, busy, multiple carts, cloned pedestrians, symmetry, watermark, logo, text"
+  },
+  {
+    "prompt": "Stylized 3D illustration. A cozy reading nook with one armchair, a side table, and a floor lamp arranged organically. Soft indirect lighting, warm tones, simple composition.",
+    "negative_prompt": "repetitive, busy, duplicated furniture, showroom symmetry, harsh reflections, watermark, text"
+  },
+  {
+    "prompt": "Aerial photography. A curving river cutting through farmland with irregular field shapes and varied colors. Natural light, high clarity, organic patterns.",
+    "negative_prompt": "repetitive, busy, grid fields, identical plots, oversharpened, watermark, logo, text"
+  },
+  {
+    "prompt": "Fantasy illustration. A solitary wizard’s tower on a hill, crooked silhouette, uneven stonework. Soft twilight lighting, atmospheric depth, painterly detail.",
+    "negative_prompt": "repetitive, busy, cloned towers, uniform bricks, symmetry, cartoon, watermark, logo, text"
+  },
+  {
+    "prompt": "Documentary-style interior photography. A small workshop with one workbench and a few scattered tools, naturally disorganized. Window light, realistic textures, lived-in feel.",
+    "negative_prompt": "repetitive, busy, identical tools, perfect alignment, staged showroom look, watermark, logo, text"
+  }
+]
