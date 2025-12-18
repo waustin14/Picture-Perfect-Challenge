@@ -3,7 +3,10 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(docker compose build:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(chmod:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.api.nvidia.com)"
     ],
     "deny": [],
     "ask": []

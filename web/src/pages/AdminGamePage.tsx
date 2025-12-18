@@ -22,7 +22,6 @@ export function AdminGamePage() {
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [attempts, setAttempts] = useState<ImageAttempt[]>([]);
 
-  // Reference images state
   const [referenceImages, setReferenceImages] = useState<ReferenceImageInfo[]>([]);
   const [selectedRefImage, setSelectedRefImage] = useState<string>("");
   const [useRandomImage, setUseRandomImage] = useState(false);
@@ -33,7 +32,6 @@ export function AdminGamePage() {
   const [creatingRound, setCreatingRound] = useState(false);
   const [endingRound, setEndingRound] = useState(false);
 
-  // Leaderboard state
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   const refreshGameState = useCallback(() => {
@@ -65,7 +63,6 @@ export function AdminGamePage() {
     return gameState.rounds.find((r) => r.id === gameState.active_round_id);
   }, [gameState]);
 
-  // Get player nickname by ID
   const getPlayerNickname = useCallback((playerId: string): string => {
     const player = gameState?.players.find(p => p.id === playerId);
     return player?.nickname || "Unknown";
@@ -74,7 +71,7 @@ export function AdminGamePage() {
   useGameWebSocket(gameId ?? "", (event: GameEvent) => {
     if (event.type === "round_started") {
       setRemainingSeconds(event.duration_seconds);
-      setAttempts([]); // Clear attempts for new round
+      setAttempts([]);
       refreshGameState();
     } else if (event.type === "round_tick") {
       setRemainingSeconds(event.remaining_seconds);
@@ -82,7 +79,6 @@ export function AdminGamePage() {
       setRemainingSeconds(0);
       refreshGameState();
     } else if (event.type === "round_results") {
-      // Round scoring complete - refresh leaderboard
       refreshLeaderboard();
       refreshGameState();
     } else if (event.type === "image_attempt_created") {
@@ -116,7 +112,6 @@ export function AdminGamePage() {
     e.preventDefault();
     if (!gameId) return;
 
-    // Validate: must have either a selected image or use random
     if (!useRandomImage && !selectedRefImage) {
       alert("Please select a reference image or choose 'Random'");
       return;
@@ -130,7 +125,6 @@ export function AdminGamePage() {
         use_random_image: useRandomImage,
       });
       await apiPost(`/rounds/${round.id}/start`);
-      // state + timer will update via WS
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : "Failed to create round");
@@ -165,7 +159,6 @@ export function AdminGamePage() {
     setEndingRound(true);
     try {
       await apiPost(`/rounds/${activeRound.id}/end`);
-      // optional: call /score here later
     } catch (e) {
       console.error(e);
     } finally {
@@ -173,214 +166,222 @@ export function AdminGamePage() {
     }
   };
 
-  // Filter to show only submitted images
   const submissions = useMemo(() => {
     return attempts.filter((a) => a.isSubmission);
   }, [attempts]);
 
+  const roundNumber = gameState?.rounds.length ?? 0;
+
   return (
-    <div className="container-fluid p-4">
-      <header className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <div className="h3">Logo</div>
+    <div className="game-container">
+      {/* Header */}
+      <header className="game-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-lg)" }}>
+          <div className="game-logo">Picture Perfect</div>
           {gameState && (
-            <div className="text-muted">
-              Game Code: <strong>{gameState.game.code}</strong>
-            </div>
+            <div className="game-code">{gameState.game.code}</div>
           )}
         </div>
-
-        <TimerDisplay remainingSeconds={remainingSeconds} />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-md)" }}>
+          <div className="text-muted">
+            Round {activeRound ? activeRound.round_number : roundNumber + 1}
+          </div>
+          <TimerDisplay remainingSeconds={remainingSeconds} />
+        </div>
       </header>
 
-
-      <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="card p-3">
-            <h5>Leaderboard</h5>
-            {leaderboard.length === 0 ? (
-              <div className="text-muted">
-                {gameState?.players.length ? "No scores yet" : "No players yet"}
-              </div>
-            ) : (
-              <table className="table table-sm mb-0">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Player</th>
-                    <th className="text-end">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((entry, index) => (
-                    <tr key={entry.player_id}>
-                      <td>
-                        {index === 0 && leaderboard.length > 1 ? "🥇" :
-                         index === 1 && leaderboard.length > 2 ? "🥈" :
-                         index === 2 && leaderboard.length > 3 ? "🥉" :
-                         index + 1}
-                      </td>
-                      <td>{entry.nickname}</td>
-                      <td className="text-end fw-bold">{entry.total_score}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {/* Show players without scores */}
-            {gameState?.players.filter(p => !leaderboard.find(l => l.player_id === p.id)).map(p => (
-              <div key={p.id} className="text-muted small">{p.nickname} (waiting)</div>
-            ))}
-          </div>
-        </div>
-        <div className="col-md-9">
-          <div className="card p-3 mb-3">
-            <h5>Round Controls</h5>
-            <form onSubmit={handleNewRound}>
-              {/* Reference Image Selection */}
-              <div className="mb-3">
-                <label className="form-label">Reference Image</label>
-                <div className="d-flex gap-2 mb-2">
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="useRandom"
-                      checked={useRandomImage}
-                      onChange={(e) => {
-                        setUseRandomImage(e.target.checked);
-                        if (e.target.checked) setSelectedRefImage("");
-                      }}
-                    />
-                    <label className="form-check-label" htmlFor="useRandom">
-                      Use Random Image
-                    </label>
+      <div className="game-main">
+        {/* Left Sidebar - Leaderboard & Players */}
+        <aside className="game-sidebar">
+          <div className="leaderboard">
+            <div className="leaderboard-title">
+              Leaderboard ({gameState?.players.length ?? 0} players)
+            </div>
+            <div className="leaderboard-list">
+              {leaderboard.length === 0 ? (
+                gameState?.players.length ? (
+                  gameState.players.map(p => (
+                    <div key={p.id} className="leaderboard-entry">
+                      <span className="leaderboard-rank">-</span>
+                      <span className="leaderboard-name">{p.nickname}</span>
+                      <span className="leaderboard-score">0</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-muted text-small">Waiting for players to join...</div>
+                )
+              ) : (
+                leaderboard.map((entry, index) => (
+                  <div key={entry.player_id} className="leaderboard-entry">
+                    <span className="leaderboard-rank">
+                      {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
+                    </span>
+                    <span className="leaderboard-name">{entry.nickname}</span>
+                    <span className="leaderboard-score">{entry.total_score}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary ms-auto"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    {uploading ? "Uploading..." : "Upload New"}
-                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Round Controls */}
+          <div className="admin-controls">
+            <form onSubmit={handleNewRound}>
+              <div className="admin-section">
+                <div className="admin-section-title">Reference Image</div>
+
+                <label className="checkbox-group mb-sm">
                   <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="d-none"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
-                    onChange={handleFileUpload}
+                    type="checkbox"
+                    className="checkbox-input"
+                    checked={useRandomImage}
+                    onChange={(e) => {
+                      setUseRandomImage(e.target.checked);
+                      if (e.target.checked) setSelectedRefImage("");
+                    }}
                   />
-                </div>
+                  <span className="checkbox-label">Use Random</span>
+                </label>
 
                 {!useRandomImage && (
-                  <div className="d-flex flex-wrap gap-2" style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  <div className="ref-image-grid">
                     {referenceImages.length === 0 ? (
-                      <div className="text-muted">No reference images uploaded yet.</div>
+                      <div className="text-muted text-small">No images uploaded</div>
                     ) : (
                       referenceImages.map((img) => (
-                        <button
+                        <div
                           key={img.url}
-                          type="button"
-                          className={`btn p-1 ${selectedRefImage === img.url ? "btn-primary" : "btn-outline-secondary"}`}
+                          className={`ref-image-thumb ${selectedRefImage === img.url ? "ref-image-thumb--selected" : ""}`}
                           onClick={() => setSelectedRefImage(img.url)}
-                          title={img.name}
-                          style={{ width: "80px", height: "80px" }}
                         >
                           <img
                             src={rewriteMinioUrl(img.url) || ""}
                             alt={img.name}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
                           />
-                        </button>
+                        </div>
                       ))
                     )}
                   </div>
                 )}
 
-                {/* Preview selected image */}
-                {selectedRefImage && !useRandomImage && (
-                  <div className="mt-2">
-                    <small className="text-muted">Selected:</small>
-                    <img
-                      src={rewriteMinioUrl(selectedRefImage) || ""}
-                      alt="Selected reference"
-                      className="d-block mt-1 rounded"
-                      style={{ maxHeight: "150px", maxWidth: "100%" }}
-                    />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  className="btn btn--outline btn--full mt-sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? "Uploading..." : "Upload Image"}
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  onChange={handleFileUpload}
+                />
               </div>
 
-              {/* Duration and Actions */}
-              <div className="row g-3 align-items-end">
-                <div className="col-md-4">
-                  <label className="form-label">Duration (seconds)</label>
+              <div className="admin-section">
+                <div className="admin-section-title">Duration</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)" }}>
                   <input
-                    type="number"
-                    className="form-control"
+                    type="range"
+                    min={30}
+                    max={180}
+                    step={15}
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
-                    min={10}
-                    max={300}
+                    style={{ flex: 1 }}
                   />
+                  <span style={{ minWidth: "50px", textAlign: "right" }}>{duration}s</span>
                 </div>
-                <div className="col-md-8 d-flex gap-2">
-                  <button
-                    className="btn btn-success flex-fill"
-                    type="submit"
-                    disabled={creatingRound || (!useRandomImage && !selectedRefImage)}
-                  >
-                    {creatingRound ? "Starting..." : "New Round"}
-                  </button>
-                  <button
-                    className="btn btn-danger flex-fill"
-                    type="button"
-                    onClick={handleEndRound}
-                    disabled={!activeRound || endingRound}
-                  >
-                    {endingRound ? "Ending..." : "End Round"}
-                  </button>
-                </div>
+              </div>
+
+              <div className="admin-section" style={{ display: "flex", gap: "var(--spacing-sm)" }}>
+                <button
+                  className="btn btn--secondary"
+                  type="submit"
+                  disabled={creatingRound || (!useRandomImage && !selectedRefImage)}
+                  style={{ flex: 1 }}
+                >
+                  {creatingRound ? "Starting..." : "Start Round"}
+                </button>
+                <button
+                  className="btn btn--danger"
+                  type="button"
+                  onClick={handleEndRound}
+                  disabled={!activeRound || endingRound}
+                  style={{ flex: 1 }}
+                >
+                  {endingRound ? "Ending..." : "End Round"}
+                </button>
               </div>
             </form>
           </div>
+        </aside>
 
-          <div className="card p-3">
-            <h5>Submitted Images</h5>
-            <div className="row g-3">
-              {submissions.length === 0 && (
-                <div className="col-12 text-muted">
-                  {activeRound ? "Waiting for player submissions..." : "Start a round to see submissions."}
-                </div>
+        {/* Main Content - Submissions */}
+        <div className="game-content">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-sm)" }}>
+            <h3 style={{ margin: 0 }}>
+              Submissions ({submissions.length}/{gameState?.players.length ?? 0})
+            </h3>
+            {activeRound && (
+              <div className="text-muted text-small">
+                Total images generated: {attempts.length}
+              </div>
+            )}
+          </div>
+
+          {submissions.length === 0 ? (
+            <div className="waiting-screen">
+              {activeRound ? (
+                <>
+                  <div className="waiting-icon">⏳</div>
+                  <p className="waiting-text">Waiting for player submissions...</p>
+                </>
+              ) : (
+                <>
+                  <div className="waiting-icon">🎮</div>
+                  <h2>Ready to Start</h2>
+                  <p className="waiting-text">
+                    {gameState?.players.length
+                      ? `${gameState.players.length} player${gameState.players.length > 1 ? 's' : ''} connected`
+                      : "Waiting for players to join"}
+                  </p>
+                  <p className="text-muted">Share the game code with players to join</p>
+                </>
               )}
+            </div>
+          ) : (
+            <div className="submissions-grid">
               {submissions.map((s) => (
-                <div key={s.id} className="col-6 col-md-3">
-                  <div className="card text-center p-2">
-                    {s.imageUrl ? (
-                      <img
-                        src={rewriteMinioUrl(s.imageUrl) || ""}
-                        alt={`Submission by ${s.playerNickname}`}
-                        className="img-fluid rounded mb-2"
-                        style={{ aspectRatio: "1", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        className="bg-secondary rounded mb-2 d-flex align-items-center justify-content-center text-white"
-                        style={{ aspectRatio: "1" }}
-                      >
-                        Loading...
-                      </div>
-                    )}
-                    <div className="fw-bold">{s.playerNickname}</div>
-                    <small className="text-muted text-truncate d-block" title={s.prompt}>
-                      {s.prompt}
-                    </small>
+                <div key={s.id} className="submission-card">
+                  {s.imageUrl ? (
+                    <img
+                      src={rewriteMinioUrl(s.imageUrl) || ""}
+                      alt={`${s.playerNickname}'s submission`}
+                      className="submission-image"
+                    />
+                  ) : (
+                    <div className="submission-image" style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--bg-card-hover)",
+                      color: "var(--text-muted)"
+                    }}>
+                      Loading...
+                    </div>
+                  )}
+                  <div className="submission-info">
+                    <div className="submission-name">{s.playerNickname}</div>
+                    <div className="submission-prompt" title={s.prompt}>{s.prompt}</div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

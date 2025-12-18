@@ -1,10 +1,16 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
-diffusers==0.30.0
-transformers==4.43.0
+
+diffusers>=0.31.0
+transformers>=4.44.0
 safetensors==0.4.3
 accelerate==0.33.0
 Pillow==10.4.0
+
+# SD 3.5 text encoder deps
+sentencepiece>=0.1.99
+protobuf>=4.25.0
+
 httpx==0.27.0
 minio==7.2.12
 opentelemetry-sdk==1.27.0

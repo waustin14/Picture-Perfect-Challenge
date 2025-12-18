@@ -34,6 +34,12 @@ export interface GameState {
   active_round_id: string | null;
 }
 
+export interface GenerateImageRequest {
+  player_id: string;
+  prompt: string;
+  negative_prompt?: string;
+}
+
 export interface GenerateImageResponse {
   image_id: string;
   player_id: string;

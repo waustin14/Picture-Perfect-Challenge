@@ -1,7 +1,10 @@
-FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/data/huggingface \
+    TRANSFORMERS_CACHE=/data/huggingface/hub \
+    HF_DATASETS_CACHE=/data/huggingface/datasets
 
 WORKDIR /app
 
@@ -12,8 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app
 COPY app ./app
 
-# Create output dir (will be a volume in docker-compose)
-RUN mkdir -p /data/images
+# Create directories for caching and output
+RUN mkdir -p /data/images /data/huggingface/hub /data/huggingface/datasets
+
+# Optional: Pre-download model during build (uncomment to enable)
+# This makes the image larger (~6-8GB) but eliminates runtime download
+# ARG MODEL_ID=stabilityai/stable-diffusion-xl-base-1.0
+# RUN python -c "from diffusers import StableDiffusionXLPipeline; StableDiffusionXLPipeline.from_pretrained('${MODEL_ID}')"
 
 EXPOSE 8080
 

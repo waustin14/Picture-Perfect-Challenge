@@ -134,9 +134,9 @@ def distance_to_similarity(d: torch.Tensor) -> torch.Tensor:
         d: Distance values (0 = identical, larger = more different)
         
     Returns:
-        Similarity scores in (0, 1], where higher is more similar
+        Similarity scores in [0, 1], where higher is more similar
     """
-    return 1.0 / (1.0 + d)
+    return 1.0 - d
 
 
 def similarity_to_distance(s: torch.Tensor) -> torch.Tensor:
@@ -144,12 +144,12 @@ def similarity_to_distance(s: torch.Tensor) -> torch.Tensor:
     Convert similarity to distance score.
     
     Args:
-        s: Similarity values in (0, 1]
+        s: Similarity values in [0, 1]
         
     Returns:
         Distance values (0 = identical, larger = more different)
     """
-    return (1.0 / s) - 1.0
+    return 1.0 - s
 
 
 # Global model instance

@@ -141,6 +141,7 @@ async def request_image_generation(
     round_id: str,
     player_id: str,
     prompt: str,
+    negative_prompt: str | None = None,
 ) -> dict:
     """
     Call the image generation service and return its JSON payload.
@@ -152,6 +153,8 @@ async def request_image_generation(
         "round_id": round_id,
         "player_id": player_id,
     }
+    if negative_prompt:
+        payload["negative_prompt"] = negative_prompt
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -597,6 +600,7 @@ async def generate_image(round_id: str, payload: schemas.GenerateImageRequest, d
         round_id=round_id,
         player_id=payload.player_id,
         prompt=payload.prompt,
+        negative_prompt=payload.negative_prompt,
     )
     db.add(attempt)
     db.flush()
@@ -607,6 +611,7 @@ async def generate_image(round_id: str, payload: schemas.GenerateImageRequest, d
             round_id=rnd.id,
             player_id=player.id,
             prompt=payload.prompt,
+            negative_prompt=payload.negative_prompt,
         )
     except Exception:
         db.rollback()
