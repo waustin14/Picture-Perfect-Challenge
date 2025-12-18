@@ -59,28 +59,63 @@ def log_gpu_memory(prefix: str = "", gpu_id: Optional[int] = None):
     print(f"[GPU Memory{f' GPU{gpu_id}' if gpu_id is not None else ''}] {prefix} Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB")
 
 
+# TensorCore-aligned batch sizes for optimal GPU utilization
+# Multiples of 8 ensure proper alignment for FP16/BF16 operations
+# FLUX supports up to 32 on high-VRAM GPUs
+TENSORCORE_ALIGNED_BATCH_SIZES = [1, 8, 16, 24, 32]
+
+
+def get_tensorcore_aligned_batch_size(raw_batch_size: int) -> int:
+    """
+    Round down to the nearest TensorCore-aligned batch size.
+
+    TensorCores are most efficient when batch dimensions are multiples of 8 (FP16/BF16)
+    or 16 (INT8). Non-aligned sizes cause tile quantization and reduced GPU utilization.
+
+    Args:
+        raw_batch_size: The calculated batch size before alignment
+
+    Returns:
+        The next lowest TensorCore-aligned batch size
+    """
+    for size in reversed(TENSORCORE_ALIGNED_BATCH_SIZES):
+        if size <= raw_batch_size:
+            return size
+    return 1
+
+
 def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
     """
     Calculate optimal batch size based on available GPU memory.
 
-    FLUX Schnell is a larger model than SDXL, so we need to account for that.
+    Returns a TensorCore-aligned batch size (multiple of 8) for optimal GPU utilization.
+    Non-aligned batch sizes cause tile quantization and significantly higher latency.
+
+    FLUX Schnell is a larger model than SDXL, requiring more conservative batch sizes.
+
+    Memory estimates:
+    - FLUX Schnell: ~12GB model + ~2.5GB per image
+    - Safety margin: 15% of total VRAM
 
     Args:
         gpu_id: Specific GPU to check, or None for cuda:0
 
     Returns:
-        Optimal batch size (minimum 1, maximum 8)
+        TensorCore-aligned batch size (1, 8, 16, 24, or 32)
     """
     # Check if manual override is set
     manual_batch_size = os.getenv("MAX_BATCH_SIZE")
     if manual_batch_size:
         try:
-            return max(1, min(8, int(manual_batch_size)))
+            raw_size = max(1, min(32, int(manual_batch_size)))
+            aligned_size = get_tensorcore_aligned_batch_size(raw_size)
+            print(f"[calculate_optimal_batch_size] Manual override: {manual_batch_size} -> {aligned_size} (TensorCore-aligned)")
+            return aligned_size
         except ValueError:
             pass
 
     # Default if no GPU or can't detect
-    default_batch_size = 2
+    default_batch_size = 8  # Aligned default
 
     if not torch.cuda.is_available():
         print("[calculate_optimal_batch_size] No CUDA available, using default batch size: 1")
@@ -99,7 +134,7 @@ def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
         print(f"[calculate_optimal_batch_size] Total VRAM: {total_memory_gb:.2f} GB")
 
         # FLUX Schnell model memory requirements
-        # FLUX is a larger model (~12GB for the base model in FP16)
+        # FLUX is a larger model (~12GB for the base model in BF16)
         model_memory_gb = 12.0  # Conservative estimate for FLUX Schnell in BF16
         per_image_memory_gb = 2.5  # FLUX uses more memory per image due to larger latent space
 
@@ -113,13 +148,16 @@ def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
             print(f"[calculate_optimal_batch_size] WARNING: Insufficient VRAM for batching, using batch size 1")
             return 1
 
-        # Calculate optimal batch size
-        optimal_batch_size = int(available_for_batching / per_image_memory_gb)
+        # Calculate raw batch size from memory
+        raw_batch_size = int(available_for_batching / per_image_memory_gb)
 
-        # Clamp between 1 and 8 (FLUX is memory intensive, so lower max)
-        optimal_batch_size = max(1, min(8, optimal_batch_size))
+        # Clamp to maximum of 32 (FLUX is memory intensive)
+        raw_batch_size = max(1, min(32, raw_batch_size))
 
-        print(f"[calculate_optimal_batch_size] Calculated optimal batch size: {optimal_batch_size}")
+        # Align to TensorCore-friendly size (round down to nearest multiple of 8)
+        optimal_batch_size = get_tensorcore_aligned_batch_size(raw_batch_size)
+
+        print(f"[calculate_optimal_batch_size] Raw batch size: {raw_batch_size} -> {optimal_batch_size} (TensorCore-aligned)")
         print(f"[calculate_optimal_batch_size]   Model: {model_memory_gb:.1f}GB")
         print(f"[calculate_optimal_batch_size]   Batching: {available_for_batching:.1f}GB ({optimal_batch_size} x {per_image_memory_gb:.1f}GB)")
         print(f"[calculate_optimal_batch_size]   Safety margin: {safety_margin_gb:.1f}GB")
