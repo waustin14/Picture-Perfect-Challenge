@@ -4,16 +4,16 @@ from typing import Optional
 
 class GenerateRequest(BaseModel):
     prompt: str
-    negative_prompt: Optional[str] = None
+    negative_prompt: Optional[str] = None  # Note: FLUX Schnell doesn't use negative prompts
 
     game_id: str
     round_id: str
     player_id: str
 
-    width: int = Field(1024, ge=256, le=1024)
-    height: int = Field(1024, ge=256, le=1024)
-    num_inference_steps: Optional[int] = Field(None, ge=4, le=50)
-    guidance_scale: Optional[float] = Field(None, ge=1.0, le=20.0)
+    width: int = Field(1024, ge=256, le=1440)
+    height: int = Field(1024, ge=256, le=1440)
+    num_inference_steps: Optional[int] = Field(None, ge=1, le=50)
+    guidance_scale: Optional[float] = Field(None, ge=0.0, le=10.0)
     seed: Optional[int] = None
 
 

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(docker compose build:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

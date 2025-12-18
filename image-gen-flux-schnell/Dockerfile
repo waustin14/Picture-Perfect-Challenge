@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -19,9 +19,9 @@ COPY app ./app
 RUN mkdir -p /data/images /data/huggingface/hub /data/huggingface/datasets
 
 # Optional: Pre-download model during build (uncomment to enable)
-# This makes the image larger (~6-8GB) but eliminates runtime download
-# ARG MODEL_ID=stabilityai/stable-diffusion-xl-base-1.0
-# RUN python -c "from diffusers import StableDiffusionXLPipeline; StableDiffusionXLPipeline.from_pretrained('${MODEL_ID}')"
+# This makes the image larger (~12GB) but eliminates runtime download
+# ARG HF_TOKEN
+# RUN python -c "from diffusers import FluxPipeline; FluxPipeline.from_pretrained('black-forest-labs/FLUX.1-schnell', token='${HF_TOKEN}')"
 
 EXPOSE 8080
 

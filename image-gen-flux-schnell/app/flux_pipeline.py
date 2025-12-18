@@ -6,7 +6,7 @@ import asyncio
 import gc
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Protocol, List, Tuple
+from typing import Optional, Protocol, List
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
@@ -16,12 +16,6 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .schemas import GenerateRequest, GenerateResponse
 from .storage import storage
-
-# Local SD imports
-from diffusers import StableDiffusionXLPipeline, StableDiffusion3Pipeline
-
-# Cloud backend imports
-import httpx
 
 
 def image_to_bytes(image: Image.Image) -> bytes:
@@ -69,27 +63,24 @@ def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
     """
     Calculate optimal batch size based on available GPU memory.
 
-    Formula:
-    - SDXL model: ~7-8GB
-    - Per-batch-item overhead: ~1.5-2GB per image
-    - Safety margin: 15% of total VRAM
+    FLUX Schnell is a larger model than SDXL, so we need to account for that.
 
     Args:
         gpu_id: Specific GPU to check, or None for cuda:0
 
     Returns:
-        Optimal batch size (minimum 1, maximum 16)
+        Optimal batch size (minimum 1, maximum 8)
     """
     # Check if manual override is set
     manual_batch_size = os.getenv("MAX_BATCH_SIZE")
     if manual_batch_size:
         try:
-            return max(1, min(32, int(manual_batch_size)))
+            return max(1, min(8, int(manual_batch_size)))
         except ValueError:
             pass
 
     # Default if no GPU or can't detect
-    default_batch_size = 4
+    default_batch_size = 2
 
     if not torch.cuda.is_available():
         print("[calculate_optimal_batch_size] No CUDA available, using default batch size: 1")
@@ -107,16 +98,10 @@ def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
         print(f"[calculate_optimal_batch_size] GPU {gpu_id if gpu_id is not None else 0}: {gpu_name}")
         print(f"[calculate_optimal_batch_size] Total VRAM: {total_memory_gb:.2f} GB")
 
-        # Model base memory requirement (depends on model type)
-        model_id = os.getenv("MODEL_ID", "stabilityai/stable-diffusion-xl-base-1.0")
-        if "stable-diffusion-3" in model_id.lower():
-            # SD 3.x models are larger
-            model_memory_gb = 11.0  # Conservative estimate for SD3.5 Large in FP16
-            per_image_memory_gb = 2.0  # SD3 uses more memory per image
-        else:
-            # SDXL and older models
-            model_memory_gb = 7.5  # Conservative estimate for SDXL in FP16
-            per_image_memory_gb = 1.8
+        # FLUX Schnell model memory requirements
+        # FLUX is a larger model (~12GB for the base model in FP16)
+        model_memory_gb = 12.0  # Conservative estimate for FLUX Schnell in BF16
+        per_image_memory_gb = 2.5  # FLUX uses more memory per image due to larger latent space
 
         # Safety margin (15% of total memory)
         safety_margin_gb = total_memory_gb * 0.15
@@ -131,12 +116,12 @@ def calculate_optimal_batch_size(gpu_id: Optional[int] = None) -> int:
         # Calculate optimal batch size
         optimal_batch_size = int(available_for_batching / per_image_memory_gb)
 
-        # Clamp between 1 and 16
-        optimal_batch_size = max(1, min(64, optimal_batch_size))
+        # Clamp between 1 and 8 (FLUX is memory intensive, so lower max)
+        optimal_batch_size = max(1, min(8, optimal_batch_size))
 
         print(f"[calculate_optimal_batch_size] Calculated optimal batch size: {optimal_batch_size}")
         print(f"[calculate_optimal_batch_size]   Model: {model_memory_gb:.1f}GB")
-        print(f"[calculate_optimal_batch_size]   Batching: {available_for_batching:.1f}GB ({optimal_batch_size} × {per_image_memory_gb:.1f}GB)")
+        print(f"[calculate_optimal_batch_size]   Batching: {available_for_batching:.1f}GB ({optimal_batch_size} x {per_image_memory_gb:.1f}GB)")
         print(f"[calculate_optimal_batch_size]   Safety margin: {safety_margin_gb:.1f}GB")
 
         return optimal_batch_size
@@ -176,12 +161,14 @@ class ImageGenBackend(Protocol):
         ...
 
 
-class LocalSDBackend:
+class LocalFluxBackend:
+    """Local FLUX Schnell backend using the diffusers library."""
+
     def __init__(self, output_dir: Path, public_base_url: str, gpu_id: Optional[int] = None):
         self.output_dir = output_dir
         self.public_base_url = public_base_url
 
-        self.model_id = os.getenv("MODEL_ID", "stabilityai/stable-diffusion-xl-base-1.0")
+        self.model_id = os.getenv("MODEL_ID", "black-forest-labs/FLUX.1-schnell")
         device_env = os.getenv("DEVICE", "auto")  # "auto" | "cuda" | "cpu"
 
         # Determine device with optional GPU ID
@@ -201,29 +188,40 @@ class LocalSDBackend:
 
         self.device = device
         self.gpu_id = gpu_id
-        torch_dtype = torch.float16 if "cuda" in str(self.device) else torch.float32
+
+        # FLUX Schnell works best with bfloat16 on supported GPUs
+        if "cuda" in str(self.device):
+            # Check if GPU supports bfloat16
+            if torch.cuda.is_bf16_supported():
+                torch_dtype = torch.bfloat16
+                print(f"[image-gen] Using bfloat16 precision (optimal for FLUX)")
+            else:
+                torch_dtype = torch.float16
+                print(f"[image-gen] GPU doesn't support bfloat16, using float16")
+        else:
+            torch_dtype = torch.float32
+
+        self.torch_dtype = torch_dtype
 
         gpu_info = f" (GPU {gpu_id})" if gpu_id is not None else ""
-        print(f"[image-gen] Using LOCAL backend with model {self.model_id} on {self.device}{gpu_info}")
+        print(f"[image-gen] Using LOCAL FLUX backend with model {self.model_id} on {self.device}{gpu_info}")
 
-        # Set model-specific defaults
+        # Set FLUX-specific defaults
         self._set_model_defaults()
 
-        # Detect model type and use appropriate pipeline
-        is_sd3 = "stable-diffusion-3" in self.model_id.lower()
-        pipeline_class = StableDiffusion3Pipeline if is_sd3 else StableDiffusionXLPipeline
+        # Import FLUX pipeline from diffusers
+        from diffusers import FluxPipeline
 
-        model_size = "~11-12GB" if is_sd3 else "~6-8GB"
-        print(f"[image-gen] Detected model type: {'SD 3.x' if is_sd3 else 'SDXL'}")
+        model_size = "~12GB"
+        print(f"[image-gen] Detected model type: FLUX Schnell")
         print(f"[image-gen] Loading model from Hugging Face...")
         print(f"[image-gen] NOTE: First run will download {model_size} model files - this can take 5-20 minutes!")
-        print(f"[image-gen] Subsequent runs will use cached model and start in ~30 seconds")
+        print(f"[image-gen] Subsequent runs will use cached model and start in ~30-60 seconds")
 
         import sys
         sys.stdout.flush()  # Force flush to ensure logs appear
 
-        # Load model with appropriate pipeline
-        # Note: SD 3.5 may require HuggingFace token for access
+        # Load model - FLUX may require HuggingFace token
         hf_token = os.getenv("HF_TOKEN")
         load_kwargs = {
             "torch_dtype": torch_dtype,
@@ -232,7 +230,7 @@ class LocalSDBackend:
             load_kwargs["token"] = hf_token
             print(f"[image-gen] Using HuggingFace token for authenticated access")
 
-        self.pipe = pipeline_class.from_pretrained(
+        self.pipe = FluxPipeline.from_pretrained(
             self.model_id,
             **load_kwargs
         )
@@ -240,6 +238,7 @@ class LocalSDBackend:
         self.pipe.to(self.device)
         print(f"[image-gen] Model ready on {self.device}")
 
+        # Enable memory optimizations if available
         try:
             self.pipe.enable_attention_slicing()
             print(f"[image-gen] Attention slicing enabled")
@@ -247,33 +246,15 @@ class LocalSDBackend:
             print(f"[image-gen] Could not enable attention slicing: {e}")
 
     def _set_model_defaults(self):
-        """Set default parameters based on the model being used."""
-        model_lower = self.model_id.lower()
-
-        if "stable-diffusion-3.5-large-turbo" in model_lower or "sd3.5-turbo" in model_lower:
-            # SD 3.5 Large Turbo: optimized for speed
-            self.default_guidance_scale = 1.0
-            self.default_num_steps = 4
-            print(f"[image-gen] Model defaults: SD 3.5 Large Turbo (cfg_scale=1.0, steps=4)")
-        elif "stable-diffusion-3.5-large" in model_lower or "sd3.5-large" in model_lower:
-            # SD 3.5 Large: optimized for quality
-            self.default_guidance_scale = 4.5
-            self.default_num_steps = 40
-            print(f"[image-gen] Model defaults: SD 3.5 Large (cfg_scale=4.5, steps=40)")
-        elif "stable-diffusion-3" in model_lower:
-            # Other SD3 models: use moderate defaults
-            self.default_guidance_scale = 5.0
-            self.default_num_steps = 28
-            print(f"[image-gen] Model defaults: SD 3.x (cfg_scale=5.0, steps=28)")
-        else:
-            # SDXL and other models: traditional defaults
-            self.default_guidance_scale = 7.5
-            self.default_num_steps = 25
-            print(f"[image-gen] Model defaults: SDXL/Other (cfg_scale=7.5, steps=25)")
+        """Set default parameters for FLUX Schnell."""
+        # FLUX Schnell is optimized for speed with few steps
+        # It uses guidance-free generation (guidance_scale is often 0 or very low)
+        self.default_guidance_scale = 0.0  # FLUX Schnell doesn't use CFG
+        self.default_num_steps = 4  # FLUX Schnell is optimized for 4 steps
+        print(f"[image-gen] Model defaults: FLUX Schnell (guidance_scale=0.0, steps=4)")
 
     def _apply_request_defaults(self, req: GenerateRequest) -> GenerateRequest:
         """Apply model-specific defaults to request if not explicitly set."""
-        # Create a copy to avoid modifying the original
         if req.guidance_scale is None:
             req.guidance_scale = self.default_guidance_scale
         if req.num_inference_steps is None:
@@ -325,15 +306,16 @@ class LocalSDBackend:
         else:
             seed = torch.randint(0, 2**31 - 1, (1,)).item()
 
-        if self.device == "cuda":
-            generator = torch.Generator(device="cuda").manual_seed(seed)
+        if "cuda" in self.device:
+            generator = torch.Generator(device=self.device).manual_seed(seed)
         else:
             generator = torch.Generator().manual_seed(seed)
 
         with torch.inference_mode():
+            # FLUX Schnell generation
+            # Note: FLUX Schnell doesn't use negative prompts effectively
             image = self.pipe(
                 prompt=req.prompt,
-                negative_prompt=req.negative_prompt,
                 width=req.width,
                 height=req.height,
                 num_inference_steps=req.num_inference_steps,
@@ -345,9 +327,9 @@ class LocalSDBackend:
         return self._save_image(image, req, seed, duration_ms)
 
 
-class BatchedLocalSDBackend:
+class BatchedLocalFluxBackend:
     """
-    Batched wrapper around LocalSDBackend that intelligently groups requests
+    Batched wrapper around LocalFluxBackend that intelligently groups requests
     for concurrent GPU inference, dramatically improving throughput.
 
     Features:
@@ -359,11 +341,11 @@ class BatchedLocalSDBackend:
 
     def __init__(self, output_dir: Path, public_base_url: str, gpu_id: Optional[int] = None):
         # Initialize the underlying backend
-        self.backend = LocalSDBackend(output_dir, public_base_url, gpu_id=gpu_id)
+        self.backend = LocalFluxBackend(output_dir, public_base_url, gpu_id=gpu_id)
         self.gpu_id = gpu_id
 
         # Batch configuration - automatically detect optimal batch size based on GPU VRAM
-        # Can be overridden via MAX_BATCH_SIZE env var
+        # FLUX is more memory intensive, so we use smaller batch sizes
         self.max_batch_size = calculate_optimal_batch_size(gpu_id)
         self.min_batch_size = int(os.getenv("MIN_BATCH_SIZE", "1"))
         self.max_wait_time = float(os.getenv("MAX_BATCH_WAIT_TIME", "5.0"))  # seconds
@@ -384,7 +366,7 @@ class BatchedLocalSDBackend:
         self._stats_lock = asyncio.Lock()
 
         gpu_info = f" (GPU {gpu_id})" if gpu_id is not None else ""
-        print(f"[BatchedLocalSDBackend{gpu_info}] Initialized with:")
+        print(f"[BatchedLocalFluxBackend{gpu_info}] Initialized with:")
         print(f"  - Max batch size: {self.max_batch_size}")
         print(f"  - Min batch size: {self.min_batch_size}")
         print(f"  - Max wait time: {self.max_wait_time}s")
@@ -395,7 +377,7 @@ class BatchedLocalSDBackend:
         """Start the background batch processor."""
         if self._processor_task is None or self._processor_task.done():
             self._processor_task = asyncio.create_task(self._batch_processor())
-            print("[BatchedLocalSDBackend] Batch processor started")
+            print("[BatchedLocalFluxBackend] Batch processor started")
 
     async def _batch_processor(self):
         """Background task that continuously processes batches."""
@@ -436,7 +418,7 @@ class BatchedLocalSDBackend:
                         self._processing = False
 
             except Exception as e:
-                print(f"[BatchedLocalSDBackend] Error in batch processor: {e}")
+                print(f"[BatchedLocalFluxBackend] Error in batch processor: {e}")
                 async with self._queue_lock:
                     self._processing = False
                 await asyncio.sleep(1)
@@ -466,7 +448,7 @@ class BatchedLocalSDBackend:
         batch_start = time.time()
         batch_size = len(batch)
 
-        print(f"[BatchedLocalSDBackend] Processing batch of {batch_size} requests")
+        print(f"[BatchedLocalFluxBackend] Processing batch of {batch_size} requests")
 
         # Log GPU memory before batch
         log_gpu_memory("Before batch:", self.gpu_id)
@@ -501,10 +483,10 @@ class BatchedLocalSDBackend:
                 if self.stats.recent_gen_times:
                     self.stats.avg_generation_time_ms = sum(self.stats.recent_gen_times) / len(self.stats.recent_gen_times)
 
-            print(f"[BatchedLocalSDBackend] Batch completed in {gen_time_ms:.0f}ms (avg wait: {sum(wait_times)/len(wait_times):.0f}ms)")
+            print(f"[BatchedLocalFluxBackend] Batch completed in {gen_time_ms:.0f}ms (avg wait: {sum(wait_times)/len(wait_times):.0f}ms)")
 
         except Exception as e:
-            print(f"[BatchedLocalSDBackend] Error processing batch: {e}")
+            print(f"[BatchedLocalFluxBackend] Error processing batch: {e}")
             import traceback
             traceback.print_exc()
 
@@ -533,9 +515,8 @@ class BatchedLocalSDBackend:
         # Apply model-specific defaults to all requests
         requests = [self.backend._apply_request_defaults(req) for req in requests]
 
-        # Collect all prompts and parameters
+        # Collect all prompts
         prompts = [req.prompt for req in requests]
-        negative_prompts = [req.negative_prompt or "" for req in requests]
 
         # Use parameters from first request (assume all similar in a batch)
         base_req = requests[0]
@@ -549,19 +530,17 @@ class BatchedLocalSDBackend:
                 seeds.append(torch.randint(0, 2**31 - 1, (1,)).item())
 
         # Create generator for the first seed (batch generation uses one seed)
-        # Note: For true per-image seeds, we'd need to generate separately
-        # This is a trade-off for batch performance
-        if self.backend.device == "cuda":
-            generator = torch.Generator(device="cuda").manual_seed(seeds[0])
+        if "cuda" in self.backend.device:
+            generator = torch.Generator(device=self.backend.device).manual_seed(seeds[0])
         else:
             generator = torch.Generator().manual_seed(seeds[0])
 
         # Run batch inference on GPU
         def _batch_inference():
             with torch.inference_mode():
+                # FLUX batch inference
                 images = self.backend.pipe(
                     prompt=prompts,
-                    negative_prompt=negative_prompts,
                     width=base_req.width,
                     height=base_req.height,
                     num_inference_steps=base_req.num_inference_steps,
@@ -580,11 +559,9 @@ class BatchedLocalSDBackend:
             responses.append(response)
 
         # Explicitly delete large objects to free memory immediately
-        # This is critical to prevent memory leaks
         del images
         del generator
         del prompts
-        del negative_prompts
 
         return responses
 
@@ -614,7 +591,7 @@ class BatchedLocalSDBackend:
                 if self.stats.current_queue_depth > self.stats.max_queue_depth:
                     self.stats.max_queue_depth = self.stats.current_queue_depth
 
-        print(f"[BatchedLocalSDBackend] Request queued at position {position} (queue depth: {position + 1})")
+        print(f"[BatchedLocalFluxBackend] Request queued at position {position} (queue depth: {position + 1})")
 
         # Wait for result
         return await future
@@ -664,10 +641,10 @@ class MultiGPUBatchedBackend:
 
         print(f"[MultiGPUBatchedBackend] Initializing with {len(self.gpu_ids)} GPU(s): {self.gpu_ids}")
 
-        # Create one BatchedLocalSDBackend per GPU
-        self.backends: List[BatchedLocalSDBackend] = []
+        # Create one BatchedLocalFluxBackend per GPU
+        self.backends: List[BatchedLocalFluxBackend] = []
         for gpu_id in self.gpu_ids:
-            backend = BatchedLocalSDBackend(output_dir, public_base_url, gpu_id=gpu_id)
+            backend = BatchedLocalFluxBackend(output_dir, public_base_url, gpu_id=gpu_id)
             self.backends.append(backend)
 
         # Load balancing strategy
@@ -680,11 +657,6 @@ class MultiGPUBatchedBackend:
     def _detect_gpus(self) -> List[int]:
         """
         Detect available GPUs from environment or system.
-
-        Checks:
-        1. GPU_IDS env var (comma-separated list, e.g., "0,1,2")
-        2. CUDA_VISIBLE_DEVICES env var
-        3. Auto-detect all available GPUs
         """
         # Check GPU_IDS env var first
         gpu_ids_env = os.getenv("GPU_IDS")
@@ -700,8 +672,6 @@ class MultiGPUBatchedBackend:
         cuda_visible = os.getenv("CUDA_VISIBLE_DEVICES")
         if cuda_visible and cuda_visible != "":
             try:
-                # CUDA_VISIBLE_DEVICES remaps GPU indices
-                # "0,2" means system GPUs 0 and 2 become cuda:0 and cuda:1
                 gpu_ids = [i for i in range(len(cuda_visible.split(",")))]
                 print(f"[MultiGPUBatchedBackend] Using GPUs from CUDA_VISIBLE_DEVICES: {gpu_ids} (mapped)")
                 return gpu_ids
@@ -724,7 +694,7 @@ class MultiGPUBatchedBackend:
         await asyncio.gather(*tasks)
         print(f"[MultiGPUBatchedBackend] All batch processors started")
 
-    async def _select_backend(self) -> BatchedLocalSDBackend:
+    async def _select_backend(self) -> BatchedLocalFluxBackend:
         """Select a backend based on load balancing strategy."""
         if self.strategy == "queue-depth":
             # Choose GPU with shortest queue
@@ -748,15 +718,12 @@ class MultiGPUBatchedBackend:
     async def generate(self, req: GenerateRequest) -> GenerateResponse:
         """
         Generate an image using the least-loaded GPU.
-
-        Requests are automatically distributed across all available GPUs.
         """
         backend = await self._select_backend()
         return await backend.generate(req)
 
     async def get_stats(self) -> dict:
         """Get aggregated statistics across all GPUs."""
-        # Gather stats from all backends
         backend_stats = await asyncio.gather(*[b.get_stats() for b in self.backends])
 
         # Aggregate totals
@@ -804,139 +771,6 @@ class MultiGPUBatchedBackend:
         }
 
 
-class StabilityBackend:
-    """
-    Uses Stability AI's text-to-image API for SDXL 1.0.
-    """
-
-    def __init__(self, output_dir: Path, public_base_url: str, fallback_backend: Optional["MockBackend"] = None):
-        self.output_dir = output_dir
-        self.public_base_url = public_base_url
-        self.fallback_backend = fallback_backend
-
-        self.api_key = os.getenv("STABILITY_API_KEY")
-        self.api_host = os.getenv("STABILITY_API_HOST", "https://api.stability.ai")
-        self.engine_id = os.getenv("STABILITY_ENGINE_ID", "stable-diffusion-xl-1024-v1-0")
-        self.allow_fallback = os.getenv("ALLOW_STABILITY_FALLBACK", "true").lower() == "true"
-        self.use_mock_only = False
-
-        if not self.api_key:
-            if self.allow_fallback and self.fallback_backend:
-                print("[image-gen] STABILITY_API_KEY missing; using mock backend instead.")
-                self.use_mock_only = True
-            else:
-                raise RuntimeError("STABILITY_API_KEY is required for Stability backend")
-
-        print(f"[image-gen] Using STABILITY backend with engine {self.engine_id}")
-
-    def generate(self, req: GenerateRequest) -> GenerateResponse:
-        if self.use_mock_only and self.fallback_backend:
-            return self.fallback_backend.generate(req)
-
-        start = time.time()
-
-        # Stability expects 1024x1024 for SDXL engine; we can clamp/override here if needed.
-        width = req.width
-        height = req.height
-
-        seed = req.seed if req.seed is not None else 0  # 0 lets API choose
-
-        # JSON text-to-image endpoint (Stability provides both JSON + binary)
-        url = f"{self.api_host}/v1/generation/{self.engine_id}/text-to-image"
-
-        payload = {
-            "text_prompts": [
-                {"text": req.prompt},
-            ],
-            "cfg_scale": req.guidance_scale,
-            "height": height,
-            "width": width,
-            "samples": 1,
-            "steps": req.num_inference_steps,
-        }
-
-        if req.negative_prompt:
-            payload["text_prompts"].append({"text": req.negative_prompt, "weight": -1.0})
-
-        if seed is not None and seed != 0:
-            payload["seed"] = seed
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-        try:
-            with httpx.Client(timeout=60.0) as client:
-                resp = client.post(url, json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception as exc:
-            if self.allow_fallback and self.fallback_backend:
-                print(f"[image-gen] Stability call failed ({exc}); using mock fallback.")
-                return self.fallback_backend.generate(req)
-            raise
-
-        # Expect first artifact as base64 image
-        artifacts = data.get("artifacts") or []
-        if not artifacts:
-            raise RuntimeError("No image artifacts returned from Stability API")
-
-        art = artifacts[0]
-        b64 = art.get("base64")
-        if not b64:
-            raise RuntimeError("No base64 image in Stability response")
-
-        import base64
-        from io import BytesIO
-
-        img_bytes = base64.b64decode(b64)
-        image = Image.open(BytesIO(img_bytes))
-
-        duration_ms = int((time.time() - start) * 1000)
-
-        # Upload to MinIO
-        image_id = str(uuid.uuid4())
-        image_png_bytes = image_to_bytes(image)
-        image_url = storage.upload_image(image_png_bytes, req.game_id, req.round_id, image_id)
-
-        # Fallback to local storage if MinIO upload fails
-        if not image_url:
-            filename = f"{image_id}.png"
-            game_dir = self.output_dir / req.game_id / req.round_id
-            game_dir.mkdir(parents=True, exist_ok=True)
-            filepath = game_dir / filename
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            image.save(filepath, format="PNG")
-            rel_path = filepath.relative_to(self.output_dir.parent)
-            image_url = f"{self.public_base_url}/{rel_path.as_posix()}"
-
-        # Stability doesn't "have" a local model_id, but we can echo engine_id
-        model_id = self.engine_id
-
-        # Stability may override or choose a different seed; if it returns one, prefer that
-        # (the JSON schema has a `seed` per artifact in many examples)
-        if "seed" in art:
-            seed = art["seed"]
-
-        return GenerateResponse(
-            image_id=image_id,
-            image_url=image_url,
-            game_id=req.game_id,
-            round_id=req.round_id,
-            player_id=req.player_id,
-            model_id=model_id,
-            seed=seed if isinstance(seed, int) else 0,
-            width=width,
-            height=height,
-            num_inference_steps=req.num_inference_steps,
-            guidance_scale=req.guidance_scale,
-            duration_ms=duration_ms,
-        )
-
-
 class MockBackend:
     """
     Lightweight fallback that creates a placeholder image when real generation is unavailable.
@@ -976,8 +810,8 @@ class MockBackend:
             seed=req.seed or 0,
             width=req.width,
             height=req.height,
-            num_inference_steps=req.num_inference_steps,
-            guidance_scale=req.guidance_scale,
+            num_inference_steps=req.num_inference_steps or 4,
+            guidance_scale=req.guidance_scale or 0.0,
             duration_ms=duration_ms,
         )
 
@@ -987,7 +821,7 @@ class MockBackend:
         # Build a simple placeholder image
         image = Image.new("RGB", (req.width, req.height), color=(32, 32, 32))
         draw = ImageDraw.Draw(image)
-        text = f"Prompt:\n{textwrap.fill(req.prompt, width=40)}"
+        text = f"FLUX Schnell (Mock)\n\nPrompt:\n{textwrap.fill(req.prompt, width=40)}"
         font = ImageFont.load_default()
         draw.multiline_text((20, 20), text, fill=(255, 255, 255), font=font, spacing=4)
 
@@ -995,7 +829,7 @@ class MockBackend:
         return self._save_image(image, req, duration_ms)
 
 
-class StableDiffusionService:
+class FluxSchnellService:
     """
     Facade that picks a backend based on GEN_MODE.
     Supports batched and non-batched modes for local generation.
@@ -1005,7 +839,7 @@ class StableDiffusionService:
     def __init__(self) -> None:
         output_dir = Path(os.getenv("OUTPUT_DIR", "/data/images"))
         output_dir.mkdir(parents=True, exist_ok=True)
-        public_base_url = os.getenv("PUBLIC_BASE_URL", "http://image-gen:8080")
+        public_base_url = os.getenv("PUBLIC_BASE_URL", "http://image-gen-flux:8080")
 
         gen_mode = os.getenv("GEN_MODE", "local").lower()
         enable_batching = os.getenv("ENABLE_BATCHING", "true").lower() == "true"
@@ -1014,19 +848,9 @@ class StableDiffusionService:
 
         self.is_async = False  # Track if backend supports async
 
-        if gen_mode == "stability":
-            try:
-                self.backend: ImageGenBackend = StabilityBackend(
-                    output_dir,
-                    public_base_url,
-                    fallback_backend=mock_backend,
-                )
-            except Exception as exc:
-                print(f"[image-gen] Failed to init stability backend ({exc}); using mock.")
-                self.backend = mock_backend
-        elif gen_mode == "mock":
-            print("[image-gen] Using MOCK backend (placeholder images).")
-            self.backend = mock_backend
+        if gen_mode == "mock":
+            print("[image-gen-flux] Using MOCK backend (placeholder images).")
+            self.backend: ImageGenBackend = mock_backend
         else:
             # default to local with optional batching and multi-GPU support
             if enable_batching:
@@ -1035,16 +859,16 @@ class StableDiffusionService:
                 use_multi_gpu = force_multi_gpu or (num_gpus > 1)
 
                 if use_multi_gpu and num_gpus > 0:
-                    print(f"[image-gen] Using LOCAL backend with MULTI-GPU BATCHING ({num_gpus} GPUs).")
+                    print(f"[image-gen-flux] Using LOCAL FLUX backend with MULTI-GPU BATCHING ({num_gpus} GPUs).")
                     self.backend = MultiGPUBatchedBackend(output_dir, public_base_url)
                     self.is_async = True
                 else:
-                    print("[image-gen] Using LOCAL backend with BATCHING enabled (single GPU).")
-                    self.backend = BatchedLocalSDBackend(output_dir, public_base_url)
+                    print("[image-gen-flux] Using LOCAL FLUX backend with BATCHING enabled (single GPU).")
+                    self.backend = BatchedLocalFluxBackend(output_dir, public_base_url)
                     self.is_async = True
             else:
-                print("[image-gen] Using LOCAL backend (batching disabled).")
-                self.backend = LocalSDBackend(output_dir, public_base_url)
+                print("[image-gen-flux] Using LOCAL FLUX backend (batching disabled).")
+                self.backend = LocalFluxBackend(output_dir, public_base_url)
 
     def _detect_gpu_count(self) -> int:
         """Detect number of available GPUs for this service."""
