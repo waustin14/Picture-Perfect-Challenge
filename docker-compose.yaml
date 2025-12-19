@@ -69,14 +69,14 @@ services:
       #   - stabilityai/stable-diffusion-xl-base-1.0 (SDXL, 6.9GB, 20-50 steps)
       #   - stabilityai/stable-diffusion-3.5-large-turbo (SD3.5 Turbo, 11GB, 4-8 steps, faster & better quality)
       #   - stabilityai/stable-diffusion-3.5-large (SD3.5 Large, 11GB, 20-50 steps, highest quality)
-      MODEL_ID: stabilityai/stable-diffusion-xl-base-1.0
+      MODEL_ID: stabilityai/stable-diffusion-3.5-large-turbo
       DEVICE: cuda
       OUTPUT_DIR: /data/images
       PUBLIC_BASE_URL: http://image-gen:8080
 
       # HuggingFace token (required for some models like SD 3.5)
       # Get token from: https://huggingface.co/settings/tokens
-      # HF_TOKEN: hf_your_token_here
+      HF_TOKEN: hf_your_token_here
 
       # Batching configuration (auto-detects optimal batch size based on GPU VRAM)
       ENABLE_BATCHING: "true"
@@ -134,9 +134,6 @@ services:
     container_name: image-game-web
     # NOTE: Vite reads env vars at build time; if you want these
     # baked into the frontend, pass them as build args in your Dockerfile too.
-    #environment:
-      # VITE_API_BASE_URL: http://logic:8000
-      # VITE_WS_BASE_URL: ws://logic:8000
     depends_on:
       - logic
     ports:
@@ -200,19 +197,19 @@ services:
     networks:
       - game_net
 
-  image-gen-flux-schnell:
-    build:
-      context: ./image-gen-flux-schnell
-    container_name: image-game-image-gen-flux-schnell
-    environment:
-      # Generation mode: "local" or "mock"
-      GEN_MODE: local
+  #image-gen-flux-schnell:
+  #  build:
+  #    context: ./image-gen-flux-schnell
+  #  container_name: image-game-image-gen-flux-schnell
+  #  environment:
+  #    # Generation mode: "local" or "mock"
+  #    GEN_MODE: local
 
       # Model configuration
-      MODEL_ID: black-forest-labs/FLUX.1-schnell
-      DEVICE: cuda
-      OUTPUT_DIR: /data/images
-      PUBLIC_BASE_URL: http://image-gen-flux-schnell:8080
+  #    MODEL_ID: black-forest-labs/FLUX.1-schnell
+  #    DEVICE: cuda
+  #    OUTPUT_DIR: /data/images
+  #    PUBLIC_BASE_URL: http://image-gen-flux-schnell:8080
 
       # HuggingFace token (may be required for FLUX model access)
       # Get token from: https://huggingface.co/settings/tokens
@@ -220,55 +217,55 @@ services:
 
       # Batching configuration (auto-detects optimal batch size based on GPU VRAM)
       # FLUX is more memory intensive, so batch sizes are typically smaller
-      ENABLE_BATCHING: "true"
+ #     ENABLE_BATCHING: "true"
       # MAX_BATCH_SIZE: 4  # Optional: Override auto-detection
-      MAX_BATCH_WAIT_TIME: "5.0"
-      MIN_BATCH_WAIT_TIME: "0.5"
-      ENABLE_ADAPTIVE_BATCHING: "true"
-      ADAPTIVE_BATCH_THRESHOLD: "10"
+ #     MAX_BATCH_WAIT_TIME: "5.0"
+ #     MIN_BATCH_WAIT_TIME: "0.5"
+ #     ENABLE_ADAPTIVE_BATCHING: "true"
+ #     ADAPTIVE_BATCH_THRESHOLD: "10"
 
       # Multi-GPU configuration (optional)
       # GPU_IDS: 0,1,2  # Specify which GPUs to use
       # GPU_LOAD_BALANCE_STRATEGY: queue-depth  # or "round-robin"
 
       # Model cache (persisted in volume at /data/huggingface)
-      HF_HOME: /data/huggingface
-      TRANSFORMERS_CACHE: /data/huggingface/hub
+ #     HF_HOME: /data/huggingface
+ #     TRANSFORMERS_CACHE: /data/huggingface/hub
 
       # MinIO storage settings
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: game-images
-      MINIO_PUBLIC_URL: http://localhost:9000
+ #     MINIO_ENDPOINT: minio:9000
+ #     MINIO_ACCESS_KEY: minioadmin
+ #     MINIO_SECRET_KEY: minioadmin
+ #     MINIO_BUCKET: game-images
+ #     MINIO_PUBLIC_URL: http://localhost:9000
 
       # OpenTelemetry
-      OTEL_SERVICE_NAME: image-gen-flux-schnell
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-    volumes:
-      - flux_data:/data  # Persists /data/images AND /data/huggingface (model cache)
-    ports:
-      - "8082:8080"
+ #     OTEL_SERVICE_NAME: image-gen-flux-schnell
+ #     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+ #   volumes:
+ #     - flux_data:/data  # Persists /data/images AND /data/huggingface (model cache)
+ #   ports:
+ #     - "8082:8080"
     # GPU support (enabled)
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: ["gpu"]
-    depends_on:
-      otel-collector:
-        condition: service_started
-      minio:
-        condition: service_healthy
-    networks:
-      - game_net
+ #   deploy:
+ #     resources:
+ #       reservations:
+ #         devices:
+ #           - capabilities: ["gpu"]
+ #   depends_on:
+ #     otel-collector:
+ #       condition: service_started
+ #     minio:
+ #       condition: service_healthy
+ #   networks:
+ #     - game_net
 
   image-sim:
     build:
       context: ./image-similarity
     container_name: image-game-image-sim
     environment:
-      DEVICE: cpu  # Change to "cuda" if GPU available
+      DEVICE: cuda
       MODEL_TYPE: dino_vitb16
       MODEL_CACHE_DIR: /app/models
       MAX_PAIRS_PER_REQUEST: 128
@@ -290,11 +287,11 @@ services:
       otel-collector:
         condition: service_started
     # Uncomment for GPU support:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: ["gpu"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
     networks:
       - game_net
 
@@ -305,7 +302,7 @@ services:
     # Replace the token value below.
   #  environment:
   #    TUNNEL_TOKEN: "REPLACE_WITH_YOUR_TUNNEL_TOKEN"
-  #  command: tunnel run
+  #  command: tunnel run --protocol http2
   #  depends_on:
   #    - web
   #  networks:
