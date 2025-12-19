@@ -29,6 +29,7 @@ The project uses a microservices architecture:
 ## Prerequisites
 
 - Docker and Docker Compose v2.0+
+- NVIDIA Container Toolkit (for using GPUs inside containers)
 - NVIDIA GPU with CUDA 12.4+ (for image generation)
 - 10+ GB free disk space (for AI models)
 - 8+ GB GPU VRAM (16+ GB recommended for SD 3.5 and FLUX)
