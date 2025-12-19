@@ -287,7 +287,7 @@ export function AdminGamePage() {
                   <input
                     type="range"
                     min={30}
-                    max={180}
+                    max={300}
                     step={15}
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
