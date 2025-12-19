@@ -19,8 +19,8 @@ The project uses a microservices architecture:
 |---------|------------|-------------|
 | **Web** | React, TypeScript, Vite | Frontend SPA served via Nginx |
 | **Logic Service** | Python, FastAPI | Game orchestration, REST API, WebSocket server |
-| **Image Generation** | Python, Stable Diffusion XL | GPU-accelerated text-to-image generation |
-| **Image Generation (FLUX)** | Python, FLUX.1-schnell | Alternative faster image generation |
+| **Image Generation** | Python, Stable Diffusion (XL and 3.5) | GPU-accelerated text-to-image generation |
+| **Image Generation (FLUX)** | Python, FLUX.1-schnell | Alternative image generation |
 | **Image Similarity** | Python, DreamSim | Perceptual similarity scoring |
 | **PostgreSQL** | PostgreSQL 16 | Game state persistence |
 | **MinIO** | S3-compatible storage | Image storage |
